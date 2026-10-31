@@ -261,9 +261,9 @@ function renderRecoveryNotice(reason?:string){
  const message=primary?.message??extra[0]??reason??'Temporary preview repair';
  const skipped=message.match(/Preview skipped undefined command (\\\S+?)\./),short=skipped?'Undefined command '+skipped[1]:message.replace(/\s+/g,' ').split(/\. (?=[A-Z])/)[0];
  el('previewNoticeTitle').textContent=(pending?'Checking edited error location':short)+where+(stale&&!pending?' · checking newer edits':'');
- const checking=model.onSave?' Keep editing; each change is checked automatically.':' Automatic preview is paused. Resume Live or choose Retry preview.';
+ const checkingText=model.onSave?' Keep editing; each change is checked automatically.':' Automatic preview is paused. Resume Live or choose Retry preview.';
  const advice=issue?diagnosticAdvice(issue.message):undefined;
- el('previewNoticeText').textContent=reason?reason+(advice?' '+advice:'')+checking:(stale?(model.onSave?'Checking your latest edits automatically.':'This error belongs to an earlier edit.'+checking):issue?(advice??'Open Details to inspect the build log.')+checking+(recovered?' Navigation is limited to unchanged mapped text. Direct PDF editing resumes after the error is fixed.':' The previous preview is retained.'):'Temporary repairs keep this preview running.'+checking);
+ el('previewNoticeText').textContent=reason?reason+(advice?' '+advice:'')+checkingText:(stale?(model.onSave?'Checking your latest edits automatically.':'This error belongs to an earlier edit.'+checkingText):issue?(advice??'Open Details to inspect the build log.')+checkingText+(recovered?' Navigation is limited to unchanged mapped text. Direct PDF editing resumes after the error is fixed.':' The previous preview is retained.'):'Temporary repairs keep this preview running.'+checkingText);
  if(!issue&&!recovered&&!reason)el('previewNoticeText').textContent=message;
  else if(primary)el('previewNoticeText').textContent=message+' '+el('previewNoticeText').textContent;
  notice.title=[primary?.message,el('previewNoticeText').textContent,...extra].filter(Boolean).join('\n');
@@ -357,7 +357,7 @@ function createState(text:string){
   if(applyingProjectReplace)return;
   if(update.docChanged||update.selectionSet){if(surroundSession)cancelSurround();navigationToken++;if(!previewApplying&&previewSession)endPreview();}
   if(update.docChanged){
-    diagnosticTracker.changed(active,at=>update.changes.mapPos(at,1),update.state.doc);
+    diagnosticTracker.changed(active,at=>update.changes.mapPos(Math.min(at,update.startState.doc.length),1),update.state.doc);
     el('pages').querySelectorAll('.navigation-marker').forEach(marker=>marker.remove());
     const edit={id:editSession+'-'+(++editSequence),startedAt:inputStartedAt||performance.now(),text:update.state.doc.toString()};inputStartedAt=0;
     localInputs.set(edit.id,{file:active,text:edit.text,startedAt:edit.startedAt,sequence:editSequence});if(localInputs.size>128)localInputs.delete(localInputs.keys().next().value!);
