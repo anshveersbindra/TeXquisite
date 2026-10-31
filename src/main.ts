@@ -116,6 +116,14 @@ const localPreview=new LocalPreview(
   candidate=>{
     const timing=candidate.timing as {roundTripMs?:number;typesetMs?:number;reprocessedSourceBytes?:number}|undefined;
     tracePreview({event:'local-output',editId:candidate.editId,layout:candidate.pageOutput?'pages':candidate.flowOutput?'flow':'paragraph',stateChanged:!!candidate.flowOutput?.stateChanged,reusedRecovery:!!candidate.reusedRecovery,sourceMatchesDraft:!!candidate.sourceMatchesDraft,compilerMs:timing?.roundTripMs,typesetMs:timing?.typesetMs,reprocessedSourceBytes:timing?.reprocessedSourceBytes});
+    // A successful compiler result can clear diagnostics before GPU/raster
+    // publication. This changes no display, navigation or export proof.
+    const priorErrors=[...currentProblems,...(currentDiagnostic?[currentDiagnostic]:[])].filter(issue=>issue.severity!=='warning');
+    if(state.onSave&&candidate.root===state.root&&candidate.editId===latestEditId&&!candidate.recovery&&candidate.sourceMatchesDraft&&priorErrors.length&&priorErrors.every(issue=>issue.kind==='tex'&&issue.file===candidate.root)){
+      currentDiagnostic=undefined;currentProblems=currentProblems.filter(issue=>issue.severity==='warning');
+      send({type:'localRecovered',root:candidate.root,editId:candidate.editId});send({type:'problems',root:candidate.root,editId:candidate.editId,issues:currentProblems});
+      tracePreview({event:'recovery-cleared-locally',editId:candidate.editId,beforeDisplay:true});
+    }
     return localMessage({type:'localPage',...candidate,visible:window.isVisible()&&!window.isMinimized(),pdf:new Uint8Array(candidate.pdf),fragmentPdf:candidate.fragmentPdf?new Uint8Array(candidate.fragmentPdf):undefined}).then(result=>{
     const accepted=result===true;
     // Expensive local calculations can outlast the original idle deadline.

@@ -1,5 +1,22 @@
 export interface BuildDiagnostic {id:string;root:string;editId?:string;severity?:'error'|'warning';kind:'tex'|'build';message:string;file?:string;line?:number;sourceHash?:string;}
 export interface DiagnosticInput {file:string;aliases:string[];}
+type DiagnosticDocument={length:number;lines:number;line:(n:number)=>{from:number;text:string};lineAt:(at:number)=>{from:number;text:string}};
+// UI freshness only: this grants no compiler, navigation or export authority.
+export class DiagnosticTracker {
+ private anchors=new Map<string,{issue:BuildDiagnostic;at:number;text:string;pending:boolean}>();
+ private same(a:BuildDiagnostic|undefined,b:BuildDiagnostic){return !!a&&a.id===b.id&&a.root===b.root&&a.file===b.file&&a.line===b.line&&a.editId===b.editId&&a.sourceHash===b.sourceHash&&a.message===b.message;}
+ sync(issues:readonly BuildDiagnostic[],file:string,editId:string|undefined,doc?:DiagnosticDocument){
+  const live=new Set(issues.map(i=>i.id));for(const id of this.anchors.keys())if(!live.has(id))this.anchors.delete(id);
+  if(!doc)return;
+  for(const issue of issues){if(issue.severity==='warning'||issue.file!==file||issue.editId!==editId||!issue.line||issue.line>doc.lines||this.same(this.anchors.get(issue.id)?.issue,issue))continue;
+   const line=doc.line(issue.line);this.anchors.set(issue.id,{issue,at:line.from,text:line.text,pending:false});
+  }
+ }
+ changed(file:string,mapPosition:(at:number)=>number,doc:DiagnosticDocument){
+  for(const anchor of this.anchors.values())if(anchor.issue.file===file){anchor.at=Math.max(0,Math.min(doc.length,mapPosition(anchor.at)));anchor.pending=doc.lineAt(anchor.at).text!==anchor.text;}
+ }
+ pending(issue:BuildDiagnostic){const anchor=this.anchors.get(issue.id);return !!anchor&&this.same(anchor.issue,issue)&&anchor.pending;}
+}
 // Resolve only captured input aliases. Compiler output never grants arbitrary
 // filesystem access, and ambiguous/wrapped filenames remain non-clickable.
 export function parseDiagnostic(text:string,inputs:DiagnosticInput[]=[]):Pick<BuildDiagnostic,'kind'|'message'|'file'|'line'>{

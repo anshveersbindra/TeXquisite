@@ -21,7 +21,7 @@ import {ContinuousView} from './continuous-view';
 import {RetainedNavigation,RetainedFrame} from './retained-navigation';
 import {forwardPosition,backward,sourceLineHasOutput,previewFocusTarget,previewFocusPrefix,PreviewFocus,liveFlowPosition,LiveFlowFrame,unchangedPageLocations} from './navigation-query';
 import type {BuildDiagnostic} from './diagnostics';
-import {diagnosticAdvice,diagnosticSuggestion,diagnosticRepair} from './diagnostics';
+import {diagnosticAdvice,diagnosticSuggestion,diagnosticRepair,DiagnosticTracker} from './diagnostics';
 import {recoveryLineBlocked,recoveryPointBlocked} from './recovery-navigation';
 import type {Navigation,Region} from './navigation';
 declare global {interface Window {desktop:{call:(method:string,...args:unknown[])=>Promise<any>;on:(callback:(message:any)=>void)=>void};}}
@@ -70,6 +70,7 @@ function clearNeutralMetadata(){for(const c of new Set([...neutralPages.values()
 function clearLocalProofs(){for(const proof of localProofs.values())proof.release();localProofs.clear();localPageProofs.clear();for(const held of localPageBaselines.values())held.release();localPageBaselines.clear();}
 let compileIssue:BuildDiagnostic|undefined;
 let projectProblems:BuildDiagnostic[]=[];
+const diagnosticTracker=new DiagnosticTracker();
 let sourceWarning='';
 let operationIssue:string|undefined,backupIssue:string|undefined;
 let logLength=0;
@@ -186,16 +187,17 @@ let editScheduled=false;
 let editChain=Promise.resolve();
 let problemRenderKey='';
 function renderProblems(){
- const key=JSON.stringify([projectProblems.map(i=>[i.id,i.sourceHash,i.line,i.message]),projectProblems.some(i=>i.editId!==latestEdit?.id),el<HTMLSelectElement>('problemFilter').value]);if(key===problemRenderKey)return;problemRenderKey=key;
- const issues=projectProblems,errors=issues.filter(i=>i.severity!=='warning').length,warnings=issues.length-errors;
- const summary=`${errors} error${errors===1?'':'s'} · ${warnings} warning${warnings===1?'':'s'}`;
+ diagnosticTracker.sync(compileIssue&&!projectProblems.some(i=>i.id===compileIssue!.id)?[...projectProblems,compileIssue]:projectProblems,active,latestEdit?.id,view?.state.doc);
+ const key=JSON.stringify([projectProblems.map(i=>[i.id,i.sourceHash,i.line,i.message,diagnosticTracker.pending(i)]),projectProblems.some(i=>i.editId!==latestEdit?.id),el<HTMLSelectElement>('problemFilter').value]);if(key===problemRenderKey)return;problemRenderKey=key;
+ const issues=projectProblems,checking=issues.filter(i=>diagnosticTracker.pending(i)).length,errors=issues.filter(i=>i.severity!=='warning'&&!diagnosticTracker.pending(i)).length,warnings=issues.filter(i=>i.severity==='warning').length;
+ const summary=`${errors} error${errors===1?'':'s'} · ${warnings} warning${warnings===1?'':'s'}`+(checking?` · ${checking} checking`:'');
  el('problemSummary').textContent=summary;
  const toggle=el<HTMLButtonElement>('toggleProblems');toggle.title='Project problems: '+summary;toggle.setAttribute('aria-label',toggle.title);toggle.dataset.count=issues.length?String(issues.length):'';toggle.classList.toggle('has-problems',!!issues.length);
  const stale=issues.some(i=>i.editId!==latestEdit?.id);el('problemState').textContent=stale?'Source changed · waiting for preview':issues.some(i=>i.id.startsWith('local-recovery-'))?'Current local preview':issues.length?'Latest full build':'No problems reported by the latest full build';
  const list=el('problemList');list.replaceChildren();const filter=el<HTMLSelectElement>('problemFilter').value;
  for(const issue of issues.filter(i=>filter==='all'||(i.severity??'error')===filter)){
-  const row=document.createElement('div');row.className='problem-row';row.setAttribute('role','listitem');row.dataset.severity=issue.severity??'error';
-  const label=document.createElement('strong');label.textContent=issue.severity==='warning'?'Warning':'Error';
+  const pending=diagnosticTracker.pending(issue),row=document.createElement('div');row.className='problem-row';row.setAttribute('role','listitem');row.dataset.severity=pending?'checking':issue.severity??'error';
+  const label=document.createElement('strong');label.textContent=pending?'Checking':issue.severity==='warning'?'Warning':'Error';
   const message=document.createElement('span');message.textContent=issue.message;
   const copy=document.createElement('div');copy.className='problem-copy';copy.append(message);const advice=diagnosticAdvice(issue.message);if(advice){const hint=document.createElement('span');hint.className='problem-advice';hint.textContent=advice;copy.append(hint);}row.append(label,copy);
   if(issue.file&&issue.line){const link=document.createElement('button');link.textContent=issue.file.split(/[\\/]/).at(-1)+' · line '+issue.line;link.title=issue.file;link.disabled=issue.editId!==latestEdit?.id;link.onclick=()=>void command(()=>navigateProblem(issue));row.append(link);}
@@ -246,19 +248,19 @@ let recoveryNoticeState='';
 function renderRecoveryNotice(reason?:string){
  const issue=compileIssue?.root===model.root?compileIssue:projectProblems.find(i=>i.root===model.root&&i.severity!=='warning'),recovered=localCanvas&&localCanvas.dataset.localEditId===latestEdit?.id?localCanvas.dataset.localRecovered==='true':current?.timing?.recovered,notice=el('previewNotice');
  const issues=projectProblems.filter(i=>i.root===model.root);if(issue&&!issues.some(i=>i.id===issue.id))issues.push(issue);
- const errors=issues.filter(i=>i.severity!=='warning').length,warnings=issues.length-errors,extra=[sourceWarning.trim()||(!errors?operationIssue:undefined),backupIssue].filter((s):s is string=>!!s);
- const count=errors+extra.length,summary=`${count} error${count===1?'':'s'}`+(warnings?` · ${warnings} warning${warnings===1?'':'s'}`:'');
+ const checking=issues.filter(i=>diagnosticTracker.pending(i)).length,errors=issues.filter(i=>i.severity!=='warning'&&!diagnosticTracker.pending(i)).length,warnings=issues.filter(i=>i.severity==='warning').length,extra=[sourceWarning.trim()||(!errors?operationIssue:undefined),backupIssue].filter((s):s is string=>!!s);
+ const count=errors+extra.length,summary=`${count} error${count===1?'':'s'}`+(checking?` · ${checking} checking`:'')+(warnings?` · ${warnings} warning${warnings===1?'':'s'}`:'');
  const stale=!!issue&&issue.editId!==latestEdit?.id,primary=issue??issues.find(i=>i.severity==='warning');
- const state=JSON.stringify([model.root,active,primary?.id,primary?.sourceHash,primary?.message,primary?.file,primary?.line,count,warnings,extra,!!issue,stale,!!recovered,reason,!!model.onSave]);
+ const pending=!!issue&&diagnosticTracker.pending(issue),state=JSON.stringify([model.root,active,primary?.id,primary?.sourceHash,primary?.message,primary?.file,primary?.line,count,checking,pending,warnings,extra,!!issue,stale,!!recovered,reason,!!model.onSave]);
  // Scrolling must not rewrite an unchanged live region or announce it again.
  if(state===recoveryNoticeState)return;recoveryNoticeState=state;
- const badge=el('errorCount');if(badge.textContent!==summary)badge.textContent=summary;badge.dataset.errors=String(count);badge.dataset.warnings=String(warnings);badge.setAttribute('aria-label',summary+'. Show details');
- el('statusBar').dataset.severity=count?'error':warnings||recovered?'warning':'normal';
+ const badge=el('errorCount');if(badge.textContent!==summary)badge.textContent=summary;badge.dataset.errors=String(count);badge.dataset.checking=String(checking);badge.dataset.warnings=String(warnings);badge.setAttribute('aria-label',summary+'. Show details');
+ el('statusBar').dataset.severity=count?'error':checking||warnings||recovered?'warning':'normal';
  notice.hidden=!issue&&!recovered&&!reason&&!extra.length&&!warnings;if(notice.hidden){notice.title='';return;}
  const where=issue?.file&&issue.line?` (${issue.file.split(/[\\/]/).at(-1)}, line ${issue.line})`:'';
  const message=primary?.message??extra[0]??reason??'Temporary preview repair';
  const skipped=message.match(/Preview skipped undefined command (\\\S+?)\./),short=skipped?'Undefined command '+skipped[1]:message.replace(/\s+/g,' ').split(/\. (?=[A-Z])/)[0];
- el('previewNoticeTitle').textContent=short+where+(stale?' · checking newer edits':'');
+ el('previewNoticeTitle').textContent=(pending?'Checking edited error location':short)+where+(stale&&!pending?' · checking newer edits':'');
  const checking=model.onSave?' Keep editing; each change is checked automatically.':' Automatic preview is paused. Resume Live or choose Retry preview.';
  const advice=issue?diagnosticAdvice(issue.message):undefined;
  el('previewNoticeText').textContent=reason?reason+(advice?' '+advice:'')+checking:(stale?(model.onSave?'Checking your latest edits automatically.':'This error belongs to an earlier edit.'+checking):issue?(advice??'Open Details to inspect the build log.')+checking+(recovered?' Navigation is limited to unchanged mapped text. Direct PDF editing resumes after the error is fixed.':' The previous preview is retained.'):'Temporary repairs keep this preview running.'+checking);
@@ -355,6 +357,7 @@ function createState(text:string){
   if(applyingProjectReplace)return;
   if(update.docChanged||update.selectionSet){if(surroundSession)cancelSurround();navigationToken++;if(!previewApplying&&previewSession)endPreview();}
   if(update.docChanged){
+    diagnosticTracker.changed(active,at=>update.changes.mapPos(at,1),update.state.doc);
     el('pages').querySelectorAll('.navigation-marker').forEach(marker=>marker.remove());
     const edit={id:editSession+'-'+(++editSequence),startedAt:inputStartedAt||performance.now(),text:update.state.doc.toString()};inputStartedAt=0;
     localInputs.set(edit.id,{file:active,text:edit.text,startedAt:edit.startedAt,sequence:editSequence});if(localInputs.size>128)localInputs.delete(localInputs.keys().next().value!);

@@ -6,7 +6,7 @@ on:
         description: Test suite
         type: choice
         default: compatibility
-        options: [compatibility, retained-preview, editing-position]
+        options: [compatibility, retained-preview, editing-position, diagnostics]
       package_retained:
         description: Build and test a portable after the retained suite passes
         type: boolean
@@ -136,7 +136,7 @@ jobs:
             ${{ env.PERSISTENT_TEX_TEST_ARTIFACTS }}/**/result.json
             ${{ env.PERSISTENT_TEX_TEST_ARTIFACTS }}/**/build.log
   retained:
-    if: ${{ inputs.suite == 'retained-preview' }}
+    if: ${{ inputs.suite == 'retained-preview' || inputs.suite == 'diagnostics' }}
     name: Retained lecture integration
     runs-on: windows-2025
     timeout-minutes: 60
@@ -195,18 +195,23 @@ jobs:
       - name: Automatically continue and clear local errors across paragraphs
         run: node scripts/automatic-recovery-test.cjs
       - name: Early-page typing, display baselines and automatic failed-frame recovery
+        if: ${{ inputs.suite != 'diagnostics' }}
         run: node scripts/editing-position-test.cjs
       - name: Early-page typing at high display density
+        if: ${{ inputs.suite != 'diagnostics' }}
         env:
           PERSISTENT_TEX_TEST_DPR: '2.5'
         run: node scripts/editing-position-test.cjs
       - name: Re-prove text separated from a drawing
+        if: ${{ inputs.suite != 'diagnostics' }}
         run: node scripts/paragraph-split-test.cjs
       - name: Check separated text at high display density
+        if: ${{ inputs.suite != 'diagnostics' }}
         env:
           PERSISTENT_TEX_TEST_DPR: '2.5'
         run: node scripts/paragraph-split-test.cjs
       - name: Normal-mode local error recovery and continued typing
+        if: ${{ inputs.suite != 'diagnostics' }}
         shell: pwsh
         run: |
           $env:PERSISTENT_TEX_LECTURE_ROUNDS='2'
@@ -219,12 +224,13 @@ jobs:
             if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
           }
       - name: Retained navigation, wrapping, deletion and display handoffs
+        if: ${{ inputs.suite != 'diagnostics' }}
         env:
           PERSISTENT_TEX_RETAINED_FLOW: '1'
         run: node scripts/retained-navigation-test.cjs
       - name: Build exact 0.111 control in a disposable checkout
         id: baseline_build
-        if: ${{ success() && steps.prepare_retained.outcome == 'success' }}
+        if: ${{ success() && steps.prepare_retained.outcome == 'success' && inputs.suite != 'diagnostics' }}
         shell: pwsh
         run: |
           git fetch --depth=1 origin 73136916c1cbd5d59175dcbf0b05148652f6c01b
@@ -239,7 +245,7 @@ jobs:
             if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
           } finally { Pop-Location }
       - name: Serialized matching baseline and candidate sessions
-        if: ${{ success() && steps.baseline_build.outcome == 'success' }}
+        if: ${{ success() && steps.baseline_build.outcome == 'success' && inputs.suite != 'diagnostics' }}
         shell: pwsh
         run: |
           $harness=Join-Path $env:GITHUB_WORKSPACE 'scripts/lecture-session-test.cjs'
@@ -279,6 +285,15 @@ jobs:
         shell: pwsh
         run: |
           $env:PERSISTENT_TEX_EXECUTABLE="$env:COMPATIBILITY_ROOT/package/win-unpacked/TeXquisite.exe"
+          if ('${{ inputs.suite }}' -eq 'diagnostics') {
+            $env:PERSISTENT_TEX_MULTI_BLOCK='0'
+            $env:PERSISTENT_TEX_RETAINED_FLOW='0'
+            foreach($test in @('performance-report','recovery-navigation','status-bar','compact-fit','recovery-idle','automatic-recovery')) {
+              node "scripts/$test-test.cjs"
+              if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}
+            }
+            exit 0
+          }
           $env:PERSISTENT_TEX_RETAINED_FLOW='1'
           node scripts/retained-navigation-test.cjs
           if($LASTEXITCODE -ne 0){exit $LASTEXITCODE}

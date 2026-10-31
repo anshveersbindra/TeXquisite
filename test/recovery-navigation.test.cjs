@@ -54,3 +54,16 @@ test('Clickable command repairs replace one exact token on the reported line onl
  assert.deepEqual(diagnosticRepair(message,'\\% \\frca',1),{from:3,to:8,insert:'\\frac'});
  for(const line of [0,-1,1.5,99])assert.equal(diagnosticRepair(message,text,line),undefined);
 });
+
+test('Diagnostic feedback tracks edited lines immediately without clearing unrelated errors',()=>{
+ const {DiagnosticTracker}=require('../dist/diagnostics'),{EditorState}=require('@codemirror/state');
+ let state=EditorState.create({doc:'Before\n\\frca{1}{2}\nBetween\n\\intt x\nTail'});const tracker=new DiagnosticTracker(),first={id:'first',root,file:root,line:2,kind:'tex',editId:'old'},second={...first,id:'second',line:4};
+ tracker.sync([first,second],root,'old',state.doc);
+ const edit=changes=>{const transaction=state.update({changes});state=transaction.state;tracker.changed(root,at=>transaction.changes.mapPos(at,1),state.doc);};
+ edit({from:0,insert:'Unrelated new line\n'});assert.equal(tracker.pending(first),false);assert.equal(tracker.pending(second),false);
+ const at=state.doc.toString().indexOf('frca');edit({from:at,to:at+4,insert:'frac'});assert.equal(tracker.pending(first),true);assert.equal(tracker.pending({...first}),true,'IPC object copies retain diagnostic identity');assert.equal(tracker.pending(second),false);
+ edit({from:at,to:at+4,insert:'frca'});assert.equal(tracker.pending(first),false,'Undo restores the still-existing error immediately');
+ edit({from:at,to:at+4,insert:'frac'});const fresh={...first,line:3,editId:'new'};tracker.sync([fresh,second],root,'new',state.doc);assert.equal(tracker.pending(fresh),false,'Compiler re-report confirms a remaining error');
+ tracker.sync([second],root,'new',state.doc);assert.equal(tracker.pending(first),false,'Removed diagnostic anchor is discarded');
+ edit({from:state.doc.length,insert:' elsewhere'});assert.equal(tracker.pending(second),false);
+});
