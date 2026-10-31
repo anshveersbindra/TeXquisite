@@ -525,3 +525,42 @@ The executable, normal-profile launcher, checksum and provenance are staged on
 Kingston. The duplicate portable ZIP was removed after verifying the staged
 bytes. This remains a draft-branch trial without a main merge, tag or new public
 binary release.
+
+## 0.121 — adjacent swaps and explicit command repairs
+
+Command suggestions now recognize one adjacent-letter swap (for example,
+`\frca` → `\frac`) as well as single-letter insertion, deletion and replacement.
+Only a unique candidate from the existing common-command list is suggested.
+The footer and Problems list offer an **Apply** button. Accepting a suggestion
+is one ordinary, undoable source edit; saving and previewing continue through
+the existing automatic path. Automatic preview-only repairs remain separate
+and never rewrite source without this explicit action.
+
+Before replacement, the renderer checks the diagnostic identity, current edit,
+file, full source hash and a unique exact command token on the reported line.
+It refuses stale actions, command prefixes, comments and repeated occurrences.
+No dialog opens automatically, and strict Build/Export verification is unchanged.
+
+[Cloud validation](https://github.com/complexzeta/TeXquisite/actions/runs/41247708671)
+passed for runtime commit `220acd9f437594540d3ac541dbdfd31f9a670a88`: 80 focused
+tests, one native retained test, all 70 integration/package records and 19
+matching runtime assets. Both source and packaged UI checks proved clicking
+Apply repairs the command and clears its error automatically, Ctrl+Z restores
+the typo, Problems offers the same action, stale actions cannot overwrite newer
+typing, and the final saved source is exact. Existing layout, navigation,
+recovery and typing checks passed. All 388 tracked files passed the privacy audit.
+
+All builds/tests used synthetic cloud documents; bulk artifacts stay on
+Kingston. No local manuscript benchmark, fresh broad TeX Live matrix or complex
+TikZ campaign was run. The compiler and WASM are unchanged, and synthetic
+results do not guarantee arbitrary-document or physical-display latency.
+
+The verified portable is 119,522,389 bytes, SHA-256:
+
+```text
+bad367afec4a1601815c5eb02cf43144d91655756929b2ddb4fc2b841faa1f40
+```
+
+This remains a draft-branch trial without a main merge, tag or new public binary
+release. The earlier candidate run was cancelled after its source suggestion
+checks passed because the final refusal-path correction superseded it.
