@@ -21,7 +21,7 @@ import {ContinuousView} from './continuous-view';
 import {RetainedNavigation,RetainedFrame} from './retained-navigation';
 import {forwardPosition,backward,sourceLineHasOutput,previewFocusTarget,previewFocusPrefix,PreviewFocus,liveFlowPosition,LiveFlowFrame,unchangedPageLocations} from './navigation-query';
 import type {BuildDiagnostic} from './diagnostics';
-import {diagnosticAdvice} from './diagnostics';
+import {diagnosticAdvice,diagnosticSuggestion,diagnosticRepair} from './diagnostics';
 import {recoveryLineBlocked,recoveryPointBlocked} from './recovery-navigation';
 import type {Navigation,Region} from './navigation';
 declare global {interface Window {desktop:{call:(method:string,...args:unknown[])=>Promise<any>;on:(callback:(message:any)=>void)=>void};}}
@@ -186,7 +186,7 @@ let editScheduled=false;
 let editChain=Promise.resolve();
 let problemRenderKey='';
 function renderProblems(){
- const key=JSON.stringify([projectProblems.map(i=>i.id),projectProblems.some(i=>i.editId!==latestEdit?.id),el<HTMLSelectElement>('problemFilter').value]);if(key===problemRenderKey)return;problemRenderKey=key;
+ const key=JSON.stringify([projectProblems.map(i=>[i.id,i.sourceHash,i.line,i.message]),projectProblems.some(i=>i.editId!==latestEdit?.id),el<HTMLSelectElement>('problemFilter').value]);if(key===problemRenderKey)return;problemRenderKey=key;
  const issues=projectProblems,errors=issues.filter(i=>i.severity!=='warning').length,warnings=issues.length-errors;
  const summary=`${errors} error${errors===1?'':'s'} · ${warnings} warning${warnings===1?'':'s'}`;
  el('problemSummary').textContent=summary;
@@ -199,6 +199,7 @@ function renderProblems(){
   const message=document.createElement('span');message.textContent=issue.message;
   const copy=document.createElement('div');copy.className='problem-copy';copy.append(message);const advice=diagnosticAdvice(issue.message);if(advice){const hint=document.createElement('span');hint.className='problem-advice';hint.textContent=advice;copy.append(hint);}row.append(label,copy);
   if(issue.file&&issue.line){const link=document.createElement('button');link.textContent=issue.file.split(/[\\/]/).at(-1)+' · line '+issue.line;link.title=issue.file;link.disabled=issue.editId!==latestEdit?.id;link.onclick=()=>void command(()=>navigateProblem(issue));row.append(link);}
+  const suggestion=diagnosticSuggestion(issue.message);if(suggestion){const apply=document.createElement('button');apply.className='apply-suggestion';configureSuggestion(apply,issue);row.append(apply);}
   list.append(row);
  }
  if(!list.childElementCount){const empty=document.createElement('p');empty.textContent=issues.length?'No problems match this filter.':'No problems reported.';list.append(empty);}
@@ -248,7 +249,7 @@ function renderRecoveryNotice(reason?:string){
  const errors=issues.filter(i=>i.severity!=='warning').length,warnings=issues.length-errors,extra=[sourceWarning.trim()||(!errors?operationIssue:undefined),backupIssue].filter((s):s is string=>!!s);
  const count=errors+extra.length,summary=`${count} error${count===1?'':'s'}`+(warnings?` · ${warnings} warning${warnings===1?'':'s'}`:'');
  const stale=!!issue&&issue.editId!==latestEdit?.id,primary=issue??issues.find(i=>i.severity==='warning');
- const state=JSON.stringify([model.root,primary?.message,primary?.file,primary?.line,count,warnings,extra,!!issue,stale,!!recovered,reason,!!model.onSave]);
+ const state=JSON.stringify([model.root,active,primary?.id,primary?.sourceHash,primary?.message,primary?.file,primary?.line,count,warnings,extra,!!issue,stale,!!recovered,reason,!!model.onSave]);
  // Scrolling must not rewrite an unchanged live region or announce it again.
  if(state===recoveryNoticeState)return;recoveryNoticeState=state;
  const badge=el('errorCount');if(badge.textContent!==summary)badge.textContent=summary;badge.dataset.errors=String(count);badge.dataset.warnings=String(warnings);badge.setAttribute('aria-label',summary+'. Show details');
@@ -267,6 +268,26 @@ function renderRecoveryNotice(reason?:string){
  const retry=el<HTMLButtonElement>('previewNoticeRetry');retry.textContent=model.onSave?'Check now':'Retry preview';retry.title=model.onSave?'Optional: recheck now. Source changes are checked automatically.':'Recheck the current source';
  retry.hidden=!issue&&!recovered&&!reason;
  const go=el<HTMLButtonElement>('previewNoticeError');go.hidden=!issue?.file||!issue.line;go.disabled=stale;
+ configureSuggestion(el<HTMLButtonElement>('previewNoticeApply'),issue);
+}
+function configureSuggestion(button:HTMLButtonElement,issue?:BuildDiagnostic){
+ const suggestion=issue&&diagnosticSuggestion(issue.message);button.hidden=!suggestion;
+ button.textContent=suggestion?'Apply '+suggestion.replacement:'';
+ button.disabled=!issue?.file||!issue.line||!issue.sourceHash||issue.editId!==latestEdit?.id;
+ button.title=suggestion?'Replace '+suggestion.command+' with '+suggestion.replacement+' in the source (undoable)':'';
+ button.onclick=()=>{if(issue)void command(()=>applySuggestion(issue));};
+}
+async function applySuggestion(issue:BuildDiagnostic){
+ const currentIssue=()=>issue.root===model.root&&issue.editId===latestEdit?.id&&(compileIssue===issue||projectProblems.includes(issue));
+ if(!currentIssue()||!issue.file||!issue.line||!issue.sourceHash)return;
+ if(active!==issue.file)await navigateProblem(issue);
+ if(!currentIssue()||active!==issue.file||!view)return;
+ const editor=view,text=editor.state.doc.toString(),bytes=new TextEncoder().encode(text.replace(/\r\n/g,'\n'));
+ const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+ if(!currentIssue()||view!==editor||active!==issue.file||editor.state.doc.toString()!==text)return;
+ const repair=hash===issue.sourceHash?diagnosticRepair(issue.message,text,issue.line):undefined;
+ if(!repair){report('This suggestion cannot be applied unambiguously to the current source. Check the reported line or let the preview recheck your edits.');return;}
+ inputStartedAt=performance.now();editor.dispatch({changes:repair,selection:{anchor:repair.from+repair.insert.length},annotations:[Transaction.userEvent.of('input.replace'),isolateHistory.of('full')],scrollIntoView:true});editor.focus();
 }
 function explainNavigation(reason:string){el('navState').textContent=reason;renderRecoveryNotice(reason);}
 el('previewNoticeError').onclick=()=>{const issue=compileIssue??projectProblems.find(i=>i.severity!=='warning');if(issue)void command(()=>navigateProblem(issue));};

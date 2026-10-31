@@ -60,13 +60,28 @@ export function parseWarnings(text:string,inputs:DiagnosticInput[]=[],processorL
 function commandSuggestion(command:string){
  const choices=['int','iint','iiint','oint','sum','prod','lim','frac','sqrt','text','emph','begin','end','left','right','langle','rangle','lfloor','rfloor','lceil','rceil','alpha','beta','gamma','theta','pi','infty'];
  const name=command.slice(1),oneEdit=(target:string)=>{if(Math.abs(target.length-name.length)>1||target===name)return false;let i=0,j=0,edits=0;while(i<name.length&&j<target.length){if(name[i]===target[j]){i++;j++;continue;}if(++edits>1)return false;if(name.length>=target.length)i++;if(target.length>=name.length)j++;}return edits+(name.length-i)+(target.length-j)===1;};
- const matches=choices.filter(oneEdit);return matches.length===1?'\\'+matches[0]:undefined;
+ const adjacentSwap=(target:string)=>{if(target.length!==name.length)return false;let i=0;while(i<name.length&&name[i]===target[i])i++;return i+1<name.length&&name[i]===target[i+1]&&name[i+1]===target[i]&&name.slice(i+2)===target.slice(i+2);};
+ const matches=choices.filter(target=>oneEdit(target)||adjacentSwap(target));return matches.length===1?'\\'+matches[0]:undefined;
+}
+export function diagnosticSuggestion(message:string):{command:string;replacement:string}|undefined{
+ const command=/undefined command (\\[A-Za-z]+)(?:[.\s]|$)/i.exec(message)?.[1],replacement=command?commandSuggestion(command):undefined;
+ return command&&replacement?{command,replacement}:undefined;
+}
+// Never guess between repeated occurrences, command prefixes, or comments.
+// The caller must also verify the diagnostic's source hash before dispatching.
+export function diagnosticRepair(message:string,text:string,line:number):{from:number;to:number;insert:string}|undefined{
+ const suggestion=diagnosticSuggestion(message);if(!suggestion||!Number.isInteger(line)||line<1)return;
+ let from=0;for(let i=1;i<line;i++){const end=text.indexOf('\n',from);if(end<0)return;from=end+1;}
+ const end=text.indexOf('\n',from),row=text.slice(from,end<0?text.length:end),matches:number[]=[];
+ for(const token of row.matchAll(/\\[A-Za-z]+|\\[^A-Za-z]|%/g)){if(token[0]==='%')break;if(token[0]===suggestion.command)matches.push(from+token.index!);}
+ if(matches.length!==1)return;
+ return {from:matches[0],to:matches[0]+suggestion.command.length,insert:suggestion.replacement};
 }
 export function diagnosticAdvice(message:string):string|undefined{
  if(/PostScript conversion failed/.test(message))return 'The PostScript converter rejected the diagram output. Open the build log for details; legacy PSTricks commands may need updating.';
  if(/Bibliography file not found/.test(message))return 'Check the .bib or .bst filename and add its folder through Support files.';
  if(/PSTricks is not configured/.test(message))return 'Open Build → Settings and select LaTeX → PostScript → PDF (PSTricks). This uses the installed latex, dvips and ps2pdf tools.';
- if(/Undefined control sequence|skipped undefined command/i.test(message)){const command=/undefined command (\\[A-Za-z]+)(?:[.\s]|$)/i.exec(message)?.[1],suggestion=command?commandSuggestion(command):undefined;return (suggestion?'Did you mean '+suggestion+'? ':'')+'Check the command spelling. If it belongs to a package or local macro, check the preamble and support files.';}
+ if(/Undefined control sequence|skipped undefined command/i.test(message)){const suggestion=diagnosticSuggestion(message);return (suggestion?'Did you mean '+suggestion.replacement+'? ':'')+'Check the command spelling. If it belongs to a package or local macro, check the preamble and support files.';}
  if(/temporarily balanced unfinished math|temporarily closed math/i.test(message))return 'Check the nearby math delimiters, braces and environment endings. Match pairs can complete them while typing.';
  if(/escaped a text-only/i.test(message))return 'Escape literal underscores and carets in text, or put the intended formula inside math delimiters.';
  if(/Missing \$ inserted/i.test(message))return 'Check nearby math delimiters ($…$, \\(…\\), or \\[…\\]). The mistake can be before the reported line.';

@@ -40,3 +40,17 @@ test('A recovered map cannot turn a native SyncTeX map into an unverified reside
 test('Repair advice suggests only a unique nearby command and keeps package guidance',()=>{
  const {diagnosticAdvice}=require('../dist/diagnostics');assert.match(diagnosticAdvice('Preview skipped undefined command \\intt.'),/Did you mean \\int\?/);assert.ok(!diagnosticAdvice('Preview skipped undefined command \\inty.').includes('Did you mean'));assert.match(diagnosticAdvice('Undefined control sequence.'),/preamble and support/);assert.match(diagnosticAdvice('Preview temporarily balanced unfinished math or an environment in this paragraph.'),/delimiters/);
 });
+
+test('Command suggestions include adjacent swaps without guessing ambiguous or distant typos',()=>{
+ const {diagnosticSuggestion}=require('../dist/diagnostics'),suggest=name=>diagnosticSuggestion('Preview skipped undefined command \\'+name+'.')?.replacement;
+ assert.equal(suggest('frca'),'\\frac');assert.equal(suggest('sqtr'),'\\sqrt');assert.equal(suggest('itn'),'\\int');assert.equal(suggest('intt'),'\\int');
+ for(const name of ['inty','frac','fcar','zzzz'])assert.equal(suggest(name),undefined,name);
+});
+
+test('Clickable command repairs replace one exact token on the reported line only',()=>{
+ const {diagnosticRepair}=require('../dist/diagnostics'),message='Preview skipped undefined command \\frca.',text='π 😀\n$\\frca{1}{2}$ % \\frca\n\\frca{3}{4}';
+ const repair=diagnosticRepair(message,text,2);assert.deepEqual(repair,{from:6,to:11,insert:'\\frac'});assert.equal(text.slice(0,repair.from)+repair.insert+text.slice(repair.to),'π 😀\n$\\frac{1}{2}$ % \\frca\n\\frca{3}{4}');
+ for(const row of ['\\frca \\frca','\\frcax','% \\frca','\\\\frca'])assert.equal(diagnosticRepair(message,row,1),undefined,row);
+ assert.deepEqual(diagnosticRepair(message,'\\% \\frca',1),{from:3,to:8,insert:'\\frac'});
+ for(const line of [0,-1,1.5,99])assert.equal(diagnosticRepair(message,text,line),undefined);
+});
