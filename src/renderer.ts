@@ -286,7 +286,7 @@ async function applySuggestion(issue:BuildDiagnostic){
  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
  if(!currentIssue()||view!==editor||active!==issue.file||editor.state.doc.toString()!==text)return;
  const repair=hash===issue.sourceHash?diagnosticRepair(issue.message,text,issue.line):undefined;
- if(!repair){report('This suggestion cannot be applied unambiguously to the current source. Check the reported line or let the preview recheck your edits.');return;}
+ if(!repair)throw new Error('This suggestion cannot be applied unambiguously to the current source. Check the reported line or let the preview recheck your edits.');
  inputStartedAt=performance.now();editor.dispatch({changes:repair,selection:{anchor:repair.from+repair.insert.length},annotations:[Transaction.userEvent.of('input.replace'),isolateHistory.of('full')],scrollIntoView:true});editor.focus();
 }
 function explainNavigation(reason:string){el('navState').textContent=reason;renderRecoveryNotice(reason);}
