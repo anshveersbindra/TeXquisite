@@ -564,3 +564,47 @@ bad367afec4a1601815c5eb02cf43144d91655756929b2ddb4fc2b841faa1f40
 This remains a draft-branch trial without a main merge, tag or new public binary
 release. The earlier candidate run was cancelled after its source suggestion
 checks passed because the final refusal-path correction superseded it.
+## 0.122 — immediate correction feedback
+
+Editing a reported error line immediately moves that report from the red error
+count into an amber checking count. Unchanged error lines remain counted, and
+undo restores the count immediately when the original erroneous line returns.
+Only the edited line is tracked through editor changes; feedback does not hash
+or scan the whole document on every keystroke. Checking is provisional and does
+not clear backend diagnostics or grant navigation, compiler or export authority.
+
+A successful local compiler result whose complete compiler input matches the
+actual draft now clears eligible root-file diagnostics before raster/display
+publication. Existing guards against unrelated errors and synthetic repairs
+remain, and strict Build/Export verification is unchanged.
+
+[Focused diagnostics validation](https://github.com/complexzeta/TeXquisite/actions/runs/41250152791)
+passed for runtime commit `d9ccaee30a1f673638908ac4e2f36d4af3453032`: 81 focused
+tests, one native retained test, all 14 diagnostics integration/package records
+and 19 matching runtime assets. Both source and packaged editor tests paused
+compilation and measured 6.3 ms for the synchronous unrelated-edit/correction
+feedback sequence. They proved the untouched error stays counted, undo restores
+the old count, corrected reports stay explicitly checking until verification,
+and checking clears automatically after resuming. These are synthetic UI-work
+measurements, not hardware keystroke-to-screen or compilation timings. Both
+source and packaged recovery tests proved compiler-confirmed clearing is sent
+before local display publication. Existing navigation, layout, automatic
+recovery, strict export and clickable-repair checks passed. All 388 tracked files
+passed the private-data audit.
+
+All builds/tests ran in the cloud; bulk artifacts remain on Kingston. The new
+manual diagnostics suite retains focused guards and source/package recovery,
+status, navigation and layout checks while skipping unrelated comparison and
+position benchmark campaigns. No fresh full 70-record performance campaign,
+broad TeX Live matrix, complex TikZ campaign or local manuscript benchmark was
+run for this UI/diagnostic change. Compiler and WASM are unchanged.
+
+The verified portable is 119,536,794 bytes, SHA-256:
+
+```text
+b98170f7dd4f6f48dada04f590d7835a1e3772e6a822ebef6ece258f8adaa4b6
+```
+
+This remains a draft-branch trial without a main merge, tag or new public binary
+release. An initial build caught and rejected a variable-name collision; the
+corrected source above passed all focused checks and packaged tests.
