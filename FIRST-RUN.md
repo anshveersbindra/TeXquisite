@@ -1,6 +1,13 @@
 # Trying TeXquisite on another Windows PC
 
-This is an early Windows x64 test release. Copy the latest TeXquisite portable executable. Your own TeX distribution supplies packages and fonts; TeXquisite does not install or download a distribution or missing packages.
+This is an early Windows x64 test release. You do not need to clone the repository, build the program, install VS Code or Node.js, or connect a GitHub account. TeXquisite runs locally.
+
+1. Install [TeX Live](https://tug.org/texlive/windows.html), including latexmk, if you do not already have it. Your TeX installation supplies packages and fonts; TeXquisite does not install a distribution or missing packages.
+2. Download **TeXquisite-0.122.0-Windows.exe** from the [0.122 release page](https://github.com/complexzeta/TeXquisite/releases/tag/v0.122.0) and put it in a folder of your choice. It is a portable application: run the executable directly. The first launch can take a while to unpack. It is an unsigned preview build, so Windows may show a publisher warning. The release page provides its SHA-256 checksum.
+3. Confirm the TeX installation in Build Settings, or select its installation/executable folder. Choose **Check installation**, then **Apply**. If fast preview is unavailable for the detected TeX Live installation, try **Prepare matching fast preview**, then **Apply**; this optional setup can take a couple of minutes once.
+4. Open your `.tex` file. For teaching, choose **Build → Working mode → Lecture** and **Continuous scroll**. Automatic saving and preview are on by default.
+
+To update, close the old version normally and run the new executable. The app keeps its local session, settings and source backups separately from the executable. Keep your normal document backups as well.
 
 On first launch, Build Settings shows the detected installation. Discovery checks PATH and common Windows TeX Live and MiKTeX locations. If your installation is elsewhere, choose its installation folder or executable folder. Check installation reports whether the selected engine, kpsewhich and latexmk run successfully, and whether article.cls, amsmath.sty, graphicx.sty and tikz.sty can be found. A failing latexmk can indicate a missing Perl runtime; its error appears in the details. Other packages and external processors depend on the document and can produce additional build errors.
 
