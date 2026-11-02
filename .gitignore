@@ -13,3 +13,5 @@ projects/
 .env.*
 *.log
 session.json
+.DS_Store
+*.DS_Store

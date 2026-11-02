@@ -3,17 +3,23 @@ import {matchLocalPatchRaster,proofDensityRetry,LOCAL_INK_BLEED_BP} from './loca
 import {placementCorrection,GlyphLookup} from './local-raster';
 import {mathSpans,isMath,nearestMathCaret,mathCaretBox,moveMath,moveMathAcross,changeMath,parseMath,MathFormula,MathSpan,MathAction} from './math-edit';
 import {EditorView,basicSetup} from 'codemirror';
+import {keymap} from '@codemirror/view';
 import {undo,redo,isolateHistory} from '@codemirror/commands';
+import {autocompletion,CompletionContext,CompletionResult,startCompletion,completionKeymap,nextSnippetField,prevSnippetField,clearSnippet,snippet} from '@codemirror/autocomplete';
+import {search,openSearchPanel,closeSearchPanel,searchKeymap} from '@codemirror/search';
 import {proseSpans,nearestCaret,caretBox,textChange,ordinaryText,textBoundary,pageProse,visualMoveAcross,ProseLine,PdfCharacter} from './preview-edit';
-import {EditorState,Transaction} from '@codemirror/state';
+import {EditorState,Transaction,Compartment} from '@codemirror/state';
 import {lintGutter,setDiagnostics,diagnosticCount} from '@codemirror/lint';
-import {StreamLanguage} from '@codemirror/language';
+import {StreamLanguage,syntaxHighlighting,HighlightStyle} from '@codemirror/language';
+import {tags as t} from '@lezer/highlight';
 import {stex} from '@codemirror/legacy-modes/mode/stex';
 import {installToolbar,toolbarButton,toolbarSelect} from './toolbar';
+import {renderSvg} from './icons';
 import {ProjectSidebar} from './project-sidebar';
 import {ProjectSearchUI} from './project-search-ui';
 import {PanelLayout} from './panel-layout';
 import {completeTex,texCompletion,surroundTex} from './tex-completion';
+import {createLatexCompletionSource} from './latex-completions';
 import {imageTex} from './image-paste';
 import {loadPdf,renderCheckedPdfRegion,copyPdfRaster} from './pdf-viewer';
 import {BaselineCache} from './baseline-cache';
@@ -24,9 +30,205 @@ import type {BuildDiagnostic} from './diagnostics';
 import {diagnosticAdvice,diagnosticSuggestion,diagnosticRepair,DiagnosticTracker} from './diagnostics';
 import {recoveryLineBlocked,recoveryPointBlocked} from './recovery-navigation';
 import type {Navigation,Region} from './navigation';
-declare global {interface Window {desktop:{call:(method:string,...args:unknown[])=>Promise<any>;on:(callback:(message:any)=>void)=>void};}}
+declare global {interface Window {desktop:{call:(method:string,...args:unknown[])=>Promise<any>;on:(callback:(message:any)=>void)=>void;platform?:string;};}}
 const api=window.desktop;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
+
+const themeCompartment = new Compartment();
+
+// Light Mode Theme (Overleaf-style vibrant sky blue selection)
+const lightEditorTheme = EditorView.theme({
+  '&': { backgroundColor: '#ffffff', color: '#1f2328' },
+  '.cm-content': { caretColor: '#0969da' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#0969da' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection, ::selection': { backgroundColor: '#b4d5fe !important' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(234, 179, 8, 0.35) !important', outline: '1px solid rgba(202, 138, 4, 0.5)' },
+  '.cm-panels': { backgroundColor: '#f6f8fa', color: '#1f2328' },
+  '.cm-gutters': { backgroundColor: '#ffffff', color: '#8c959f', borderRight: '1px solid #d0d7de' },
+  '.cm-activeLine': { backgroundColor: '#f6f8fa80' },
+  '.cm-activeLineGutter': { backgroundColor: '#eaeef2', color: '#1f2328' }
+}, { dark: false });
+
+// Dark Obsidian Theme
+const darkEditorTheme = EditorView.theme({
+  '&': { backgroundColor: '#181a1e', color: '#e6edf3' },
+  '.cm-content': { caretColor: '#58a6ff' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#58a6ff' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection, ::selection': { backgroundColor: '#1d4f91 !important' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(234, 179, 8, 0.25) !important', outline: '1px solid rgba(234, 179, 8, 0.45)' },
+  '.cm-panels': { backgroundColor: '#1b1d22', color: '#e6edf3' },
+  '.cm-gutters': { backgroundColor: '#181a1e', color: '#6e7681', borderRight: '1px solid #282c34' },
+  '.cm-activeLine': { backgroundColor: '#1e2229' },
+  '.cm-activeLineGutter': { backgroundColor: '#262b34', color: '#e6edf3' }
+}, { dark: true });
+
+// Midnight Pure Black OLED Theme
+const midnightEditorTheme = EditorView.theme({
+  '&': { backgroundColor: '#0a0a0d', color: '#f0f3f6' },
+  '.cm-content': { caretColor: '#58a6ff' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#58a6ff' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection, ::selection': { backgroundColor: '#1e40af88 !important' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(234, 179, 8, 0.25) !important', outline: '1px solid rgba(234, 179, 8, 0.45)' },
+  '.cm-panels': { backgroundColor: '#050508', color: '#f0f3f6' },
+  '.cm-gutters': { backgroundColor: '#0a0a0d', color: '#555e69', borderRight: '1px solid #161820' },
+  '.cm-activeLine': { backgroundColor: '#12141a' },
+  '.cm-activeLineGutter': { backgroundColor: '#181b22', color: '#f0f3f6' }
+}, { dark: true });
+
+// Nord Arctic Navy Theme
+const nordEditorTheme = EditorView.theme({
+  '&': { backgroundColor: '#2e3440', color: '#eceff4' },
+  '.cm-content': { caretColor: '#88c0d0' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#88c0d0' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection, ::selection': { backgroundColor: '#435b7d !important' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(235, 203, 139, 0.3) !important', outline: '1px solid rgba(235, 203, 139, 0.5)' },
+  '.cm-panels': { backgroundColor: '#242933', color: '#eceff4' },
+  '.cm-gutters': { backgroundColor: '#2e3440', color: '#616e85', borderRight: '1px solid #3b4252' },
+  '.cm-activeLine': { backgroundColor: '#353c4a' },
+  '.cm-activeLineGutter': { backgroundColor: '#3b4252', color: '#88c0d0' }
+}, { dark: true });
+
+// Warm Sepia Theme
+const warmEditorTheme = EditorView.theme({
+  '&': { backgroundColor: '#fcf9f2', color: '#332719' },
+  '.cm-content': { caretColor: '#8a5827' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#8a5827' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection, ::selection': { backgroundColor: '#d8b67d !important' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(180, 83, 9, 0.25) !important', outline: '1px solid rgba(180, 83, 9, 0.45)' },
+  '.cm-panels': { backgroundColor: '#ede4d5', color: '#332719' },
+  '.cm-gutters': { backgroundColor: '#fcf9f2', color: '#998670', borderRight: '1px solid #e6dbca' },
+  '.cm-activeLine': { backgroundColor: '#f5efe0' },
+  '.cm-activeLineGutter': { backgroundColor: '#ede4d5', color: '#8a5827' }
+}, { dark: false });
+
+const darkSyntaxHighlighting = syntaxHighlighting(HighlightStyle.define([
+  { tag: t.keyword, color: '#ff7b72' },
+  { tag: [t.name, t.deleted, t.character, t.macroName], color: '#79c0ff' },
+  { tag: [t.function(t.variableName), t.labelName], color: '#d2a8ff' },
+  { tag: [t.color, t.constant(t.name), t.standard(t.name)], color: '#79c0ff' },
+  { tag: [t.definition(t.name), t.separator], color: '#ffa657' },
+  { tag: [t.typeName, t.className, t.number, t.changed, t.annotation, t.modifier, t.self, t.namespace], color: '#7ee787' },
+  { tag: [t.operator, t.operatorKeyword, t.url, t.escape, t.regexp, t.link, t.special(t.string)], color: '#a5d6ff' },
+  { tag: [t.meta, t.comment], color: '#8b949e', fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: 'bold', color: '#e6edf3' },
+  { tag: t.emphasis, fontStyle: 'italic', color: '#e6edf3' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: t.link, color: '#58a6ff', textDecoration: 'underline' },
+  { tag: t.heading, fontWeight: 'bold', color: '#79c0ff' },
+  { tag: [t.atom, t.bool, t.special(t.variableName)], color: '#ff7b72' },
+  { tag: t.bracket, color: '#f0883e' },
+  { tag: [t.processingInstruction, t.string, t.inserted], color: '#a5d6ff' },
+  { tag: t.invalid, color: '#f85149' }
+]));
+
+let currentThemeSetting: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm' = 'auto';
+let currentPdfInvert = false;
+let systemIsDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
+
+function computeIsDark(): boolean {
+  if (['dark', 'midnight', 'nord'].includes(currentThemeSetting)) return true;
+  if (['light', 'warm'].includes(currentThemeSetting)) return false;
+  return systemIsDark;
+}
+
+function getThemeExtensions(theme: string, isDark: boolean) {
+  if (theme === 'midnight') return [midnightEditorTheme, darkSyntaxHighlighting];
+  if (theme === 'nord') return [nordEditorTheme, darkSyntaxHighlighting];
+  if (theme === 'warm') return [warmEditorTheme];
+  if (theme === 'dark' || (theme === 'auto' && isDark)) return [darkEditorTheme, darkSyntaxHighlighting];
+  return [lightEditorTheme];
+}
+
+function applyTheme(theme?: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm', pdfInvert?: boolean) {
+  if (theme !== undefined) currentThemeSetting = theme;
+  if (pdfInvert !== undefined) currentPdfInvert = pdfInvert;
+  const isDark = computeIsDark();
+  const effectiveTheme = currentThemeSetting === 'auto' ? (systemIsDark ? 'dark' : 'light') : currentThemeSetting;
+
+  document.documentElement.dataset.theme = effectiveTheme;
+  document.documentElement.dataset.themeSetting = currentThemeSetting;
+  document.documentElement.dataset.isDark = String(isDark);
+  document.documentElement.dataset.pdfInvert = String(currentPdfInvert);
+
+  const themeBtn = el('toggleTheme');
+  if (themeBtn) {
+    const titles: Record<string, string> = {
+      auto: 'Auto',
+      dark: 'Dark',
+      midnight: 'Midnight',
+      nord: 'Nord',
+      light: 'Light',
+      warm: 'Warm'
+    };
+    themeBtn.classList.remove('icon-button');
+    themeBtn.classList.add('has-label');
+    themeBtn.innerHTML = `${renderSvg('theme', 13)} <span>Theme: ${titles[currentThemeSetting] || 'Auto'}</span>`;
+    themeBtn.setAttribute('title', `Theme: ${titles[currentThemeSetting] || 'Auto'} (Click to switch)`);
+    themeBtn.setAttribute('aria-pressed', String(isDark));
+  }
+  const invertBtn = el('togglePdfInvert');
+  if (invertBtn) {
+    invertBtn.classList.remove('icon-button');
+    invertBtn.classList.add('has-label');
+    invertBtn.setAttribute('aria-pressed', String(currentPdfInvert));
+    invertBtn.innerHTML = `${renderSvg('pdfContrast', 12)} <span>${currentPdfInvert ? 'Dark PDF' : 'White PDF'}</span>`;
+    invertBtn.title = currentPdfInvert ? 'PDF Dark Inversion: On (Click for white paper)' : 'PDF White Paper (Click for dark mode PDF)';
+  }
+  const prefTheme = el<HTMLSelectElement>('prefTheme');
+  if (prefTheme) prefTheme.value = currentThemeSetting;
+  const prefPdfInvert = el<HTMLInputElement>('prefPdfInvert');
+  if (prefPdfInvert) prefPdfInvert.checked = currentPdfInvert;
+
+  const themeExt = getThemeExtensions(currentThemeSetting, isDark);
+  if (view) {
+    view.dispatch({ effects: themeCompartment.reconfigure(themeExt) });
+  }
+}
+
+window.matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener('change', e => {
+  systemIsDark = e.matches;
+  applyTheme();
+});
+
+// Bibliography References Autocomplete Support
+let cachedBibEntries: Array<{key:string; type:string; title?:string; author?:string; year?:string; file:string}> = [];
+async function refreshBibEntries() {
+  try {
+    cachedBibEntries = await api.call('fetchBibEntries');
+  } catch {}
+}
+
+function getDocumentLabels(): Array<{ label: string; file: string; line: number }> {
+  const result: Array<{ label: string; file: string; line: number }> = [];
+  const labelRegex = /\\label\{([^}]+)\}/g;
+  for (const doc of model?.docs ?? []) {
+    let match: RegExpExecArray | null;
+    const text = doc.text || '';
+    while ((match = labelRegex.exec(text)) !== null) {
+      if (match[1]) {
+        const line = text.slice(0, match.index).split('\n').length;
+        result.push({
+          label: match[1],
+          file: doc.path || '',
+          line
+        });
+      }
+    }
+  }
+  return result;
+}
+
+const latexCompletionSource = createLatexCompletionSource(
+  () => {
+    if (!cachedBibEntries.length) {
+      void refreshBibEntries();
+    }
+    return cachedBibEntries;
+  },
+  getDocumentLabels,
+  () => active
+);
+
 let model:any={docs:[]}, active='',view:EditorView|undefined;
 const states=new Map<string,EditorState>();
 installToolbar();
@@ -164,13 +366,30 @@ previewInput.addEventListener('keydown',event=>{
   drawPreviewCaret();
 });
 for(const button of el('mathTools').querySelectorAll<HTMLButtonElement>('button')){
- button.addEventListener('mousedown',event=>event.preventDefault());button.addEventListener('click',()=>{if(previewSession?.math){previewChange('',false,false,button.dataset.math as MathAction);previewInput.focus({preventScroll:true});}});
+ button.addEventListener('mousedown',event=>event.preventDefault());
+ button.addEventListener('click',()=>{
+   const mathType=button.dataset.math;
+   if(!mathType)return;
+   if(view&&!model.previewEditing){
+     insertMathSnippet(view,mathType);
+     return;
+   }
+   if(previewSession?.math){
+     previewChange('',false,false,mathType as MathAction);
+     previewInput.focus({preventScroll:true});
+   }
+ });
 }
 function refreshPreviewStatus(){
   if(localCanvas?.dataset.localRecovered==='true'&&localCanvas.dataset.localEditId===latestEdit?.id){el('previewState').textContent='Recovered local preview · details in Problems';el('status').textContent=localStatus+' Temporary preview repair; saved source is unchanged.'+sourceWarning;previewUpdating=false;return;}
   if(current?.timing?.recovered&&current.timing.editId===latestEdit?.id){el('previewState').textContent='Recovered preview · LaTeX errors need attention';el('status').textContent=current.displayStatus+sourceWarning;previewUpdating=false;return;}
-  if(localCanvas?.dataset.localLayout==='flow'&&localCanvas.dataset.localEditId===latestEdit?.id&&current?.timing?.editId===latestEdit?.id){el('previewState').textContent='Continuous scroll · paginated PDF verified';el('status').textContent=localStatus.replace('Paginated PDF verification pending.','Paginated PDF verified.')+sourceWarning;previewUpdating=false;return;}
-  if(localCanvas){const newer=localCanvas.dataset.localEditId!==latestEdit?.id,lecture=model.previewMode==='lecture';el('previewState').textContent=(lecture?'Lecture preview · ':'Local paragraph preview · ')+(newer?'newer edits pending':lecture?'full PDF updates on Build or Export':'full document verification pending');el('status').textContent=(lecture?localStatus.replace(/(?:Paginated PDF|Full document) verification pending\./g,'Full PDF updates on Build or Export.'):localStatus)+(newer?' Newer edits pending.':'')+sourceWarning;return;}
+  if(localCanvas?.dataset.localLayout==='flow'&&localCanvas.dataset.localEditId===latestEdit?.id&&current?.timing?.editId===latestEdit?.id){el('previewState').textContent='Continuous scroll · paginated PDF verified';el('status').textContent=localStatus+sourceWarning;previewUpdating=false;return;}
+  if(localCanvas){
+    const newer=localCanvas.dataset.localEditId!==latestEdit?.id,lecture=model.previewMode==='lecture';
+    el('previewState').textContent=(lecture?'Lecture preview · ':(model.continuousPreview?'Continuous live · ':'Live typing · '))+(newer?'typing…':'Instant preview');
+    el('status').textContent=localStatus+(newer?' Typing…':'')+sourceWarning;
+    return;
+  }
   const pending=!previewKnownCurrent||!!latestEdit&&current?.timing?.editId!==latestEdit.id;
   if(pending||!current?.displayReady){
     const elapsed=latestEdit?` (${Math.ceil(performance.now()-latestEdit.startedAt)} ms since latest edit)`:'';
@@ -245,8 +464,13 @@ function renderIssue(){
   panel.dataset.kind=compileIssue.kind;
 }
 let recoveryNoticeState='';
+let toolchainNoticeDismissed=false;
+let previewNoticeDismissed=false;
+let lastNoticeIssueId='';
 function renderRecoveryNotice(reason?:string){
  const issue=compileIssue?.root===model.root?compileIssue:projectProblems.find(i=>i.root===model.root&&i.severity!=='warning'),recovered=localCanvas&&localCanvas.dataset.localEditId===latestEdit?.id?localCanvas.dataset.localRecovered==='true':current?.timing?.recovered,notice=el('previewNotice');
+ const currentIssueId=issue?issue.id+':'+(issue.editId??''):(recovered?'recovered':reason??'');
+ if(currentIssueId!==lastNoticeIssueId){lastNoticeIssueId=currentIssueId;previewNoticeDismissed=false;}
  const issues=projectProblems.filter(i=>i.root===model.root);if(issue&&!issues.some(i=>i.id===issue.id))issues.push(issue);
  const checking=issues.filter(i=>diagnosticTracker.pending(i)).length,errors=issues.filter(i=>i.severity!=='warning'&&!diagnosticTracker.pending(i)).length,warnings=issues.filter(i=>i.severity==='warning').length,extra=[sourceWarning.trim()||(!errors?operationIssue:undefined),backupIssue].filter((s):s is string=>!!s);
  const count=errors+extra.length,summary=`${count} error${count===1?'':'s'}`+(checking?` · ${checking} checking`:'')+(warnings?` · ${warnings} warning${warnings===1?'':'s'}`:'');
@@ -256,7 +480,7 @@ function renderRecoveryNotice(reason?:string){
  if(state===recoveryNoticeState)return;recoveryNoticeState=state;
  const badge=el('errorCount');if(badge.textContent!==summary)badge.textContent=summary;badge.dataset.errors=String(count);badge.dataset.checking=String(checking);badge.dataset.warnings=String(warnings);badge.setAttribute('aria-label',summary+'. Show details');
  el('statusBar').dataset.severity=count?'error':checking||warnings||recovered?'warning':'normal';
- notice.hidden=!issue&&!recovered&&!reason&&!extra.length&&!warnings;if(notice.hidden){notice.title='';return;}
+ notice.hidden=previewNoticeDismissed||(!issue&&!recovered&&!reason&&!extra.length&&!warnings);if(notice.hidden){notice.title='';return;}
  const where=issue?.file&&issue.line?` (${issue.file.split(/[\\/]/).at(-1)}, line ${issue.line})`:'';
  const message=primary?.message??extra[0]??reason??'Temporary preview repair';
  const skipped=message.match(/Preview skipped undefined command (\\\S+?)\./),short=skipped?'Undefined command '+skipped[1]:message.replace(/\s+/g,' ').split(/\. (?=[A-Z])/)[0];
@@ -296,6 +520,14 @@ el('previewNoticeError').onclick=()=>{const issue=compileIssue??projectProblems.
 el('previewNoticeDetails').onclick=()=>{if(projectProblems.length){el<HTMLDetailsElement>('problems').open=true;el<HTMLSelectElement>('problemFilter').value='all';renderProblems();}else if(backupIssue)void command(showBackups);else el<HTMLDetailsElement>('logs').open=true;};
 el('errorCount').onclick=()=>{if(!el('previewNotice').hidden)el('previewNoticeDetails').click();else el('toggleProblems').click();};
 el('previewNoticeRetry').onclick=()=>void command(async()=>{const button=el<HTMLButtonElement>('previewNoticeRetry');button.disabled=true;try{await flush();canonicalRequested=true;await api.call('retryPreview');}finally{button.disabled=false;}});
+el('previewNoticeDismiss').onclick=()=>{previewNoticeDismissed=true;el('previewNotice').hidden=true;};
+el('dismissToolchainNotice').onclick=()=>{toolchainNoticeDismissed=true;el('toolchainNotice').hidden=true;};
+el('dismissDiagnostics').onclick=()=>{el('diagnostics').hidden=true;};
+el('dismissBackupWarning').onclick=()=>{el('backupWarning').hidden=true;};
+el('openLogBtn').onclick=()=>{const logs=el<HTMLDetailsElement>('logs');logs.open=!logs.open;if(logs.open)el('log').scrollIntoView({behavior:'smooth',block:'nearest'});};
+el('copyLogBtn').onclick=e=>{e.stopPropagation();void navigator.clipboard.writeText(el('log').textContent||'');const btn=el<HTMLButtonElement>('copyLogBtn'),orig=btn.textContent;btn.textContent='Copied!';setTimeout(()=>{btn.textContent=orig;},1500);};
+el('clearLogBtn').onclick=e=>{e.stopPropagation();el('log').textContent='';};
+el('closeLogBtn').onclick=e=>{e.stopPropagation();el<HTMLDetailsElement>('logs').open=false;};
 el('diagnosticLog').onclick=()=>{el<HTMLDetailsElement>('logs').open=true;el('logs').querySelector('summary')!.focus();};
 el('diagnosticLocation').onclick=()=>{if(compileIssue)void command(()=>navigateProblem(compileIssue!));};
 async function navigateProblem(issue:BuildDiagnostic){
@@ -339,10 +571,121 @@ surroundInput.addEventListener('input',()=>{if(!acceptSurround()&&surroundSessio
 surroundBox.addEventListener('submit',event=>{event.preventDefault();if(!acceptSurround())el('surroundHint').textContent='Unknown delimiter. Correct it or press Esc to cancel.';});
 surroundInput.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();cancelSurround(true);}});
 surroundInput.addEventListener('blur',()=>{if(surroundSession)cancelSurround();});
+function insertMathSnippet(editor: EditorView, type: string): boolean {
+  const sel = editor.state.selection.main;
+  const selectedText = editor.state.sliceDoc(sel.from, sel.to);
+  let template = '';
+  switch (type) {
+    case 'frac':
+      template = selectedText ? `\\frac{${selectedText}}{\${1}}` : '\\frac{${1:numerator}}{${2:denominator}}';
+      break;
+    case 'sqrt':
+      template = selectedText ? `\\sqrt{${selectedText}}` : '\\sqrt{${1:x}}';
+      break;
+    case 'inline':
+    case 'math':
+      template = selectedText ? `$${selectedText}$` : '$${1}$';
+      break;
+    case 'display':
+      template = selectedText ? `\\[\n\t${selectedText}\n\\]` : '\\[\n\t${1}\n\\]';
+      break;
+    case 'sum':
+      template = selectedText ? `\\sum_{${selectedText}}^{\${1:n}}` : '\\sum_{${1:i=1}}^{${2:n}}';
+      break;
+    case 'int':
+      template = selectedText ? `\\int_{${selectedText}}^{\${1:b}}` : '\\int_{${1:a}}^{${2:b}}';
+      break;
+    case 'sup':
+      template = selectedText ? `^{${selectedText}}` : '^{${1}}';
+      break;
+    case 'sub':
+      template = selectedText ? `_{${selectedText}}` : '_{${1}}';
+      break;
+    case 'pi':
+      template = '\\pi';
+      break;
+    default:
+      return false;
+  }
+  snippet(template)(editor, null, sel.from, sel.to);
+  editor.focus();
+  return true;
+}
+
+const latexKeymap = keymap.of([
+  {
+    key: 'Enter',
+    run(editor: EditorView): boolean {
+      if (model.autoClose === false) return false;
+      const state = editor.state;
+      const sel = state.selection.main;
+      if (!sel.empty) return false;
+      const line = state.doc.lineAt(sel.head);
+      const before = line.text.slice(0, sel.head - line.from);
+      const after = line.text.slice(sel.head - line.from);
+      const match = before.match(/^(\s*)\\begin\{([^{}]+)\}\s*$/);
+      if (match) {
+        const indent = match[1];
+        const env = match[2];
+        const endRegex = new RegExp(`^\\\\end\\{${env.replace(/[*.]/g, '\\$&')}\\}`);
+        const afterTrimmed = after.trimStart();
+        if (endRegex.test(afterTrimmed)) {
+          const insertText = `\n${indent}\t\n${indent}`;
+          editor.dispatch({
+            changes: { from: sel.head, to: sel.head + (after.length - afterTrimmed.length), insert: insertText },
+            selection: { anchor: sel.head + 1 + indent.length + 1 },
+            annotations: Transaction.userEvent.of('input.type'),
+            scrollIntoView: true
+          });
+          return true;
+        } else {
+          const insertText = `\n${indent}\t\n${indent}\\end{${env}}`;
+          editor.dispatch({
+            changes: { from: sel.head, insert: insertText },
+            selection: { anchor: sel.head + 1 + indent.length + 1 },
+            annotations: Transaction.userEvent.of('input.type'),
+            scrollIntoView: true
+          });
+          return true;
+        }
+      }
+      return false;
+    }
+  },
+  {
+    key: 'Mod-Space',
+    run: startCompletion
+  },
+  {
+    key: 'Tab',
+    run: nextSnippetField,
+    shift: prevSnippetField
+  },
+  {
+    key: 'Escape',
+    run: (v: EditorView) => {
+      if (clearSnippet(v)) return true;
+      if (closeSearchPanel(v)) return true;
+      return false;
+    }
+  },
+  // Non-clashing dedicated math insertion / wrapping shortcuts
+  { key: 'Alt-f', run: (v: EditorView) => insertMathSnippet(v, 'frac') },
+  { key: 'Alt-r', run: (v: EditorView) => insertMathSnippet(v, 'sqrt') },
+  { key: 'Alt-m', run: (v: EditorView) => insertMathSnippet(v, 'inline') },
+  { key: 'Alt-d', run: (v: EditorView) => insertMathSnippet(v, 'display') },
+  { key: 'Alt-p', run: (v: EditorView) => insertMathSnippet(v, 'pi') },
+  { key: 'Alt-s', run: (v: EditorView) => insertMathSnippet(v, 'sum') },
+  { key: 'Alt-i', run: (v: EditorView) => insertMathSnippet(v, 'int') },
+  { key: 'Alt-^', run: (v: EditorView) => insertMathSnippet(v, 'sup') },
+  { key: 'Alt-_', run: (v: EditorView) => insertMathSnippet(v, 'sub') },
+  { key: 'Mod-w', run: () => { closeTab(); return true; } },
+  ...completionKeymap
+]);
 function createState(text:string){
  let pointer:{id:number;x:number;y:number}|undefined,pointerGeneration=0;
  const textHit=(event:PointerEvent,editor:EditorView)=>{const line=event.target instanceof Element?event.target.closest('.cm-line'):undefined;if(!line||!editor.contentDOM.contains(line))return false;const range=document.createRange();range.selectNodeContents(line);return [...range.getClientRects()].some(r=>r.width>0&&event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom);};
- return EditorState.create({doc:text,extensions:[basicSetup,lintGutter(),StreamLanguage.define(stex),texCompletion(()=>model.autoClose!==false),EditorView.lineWrapping,
+ return EditorState.create({doc:text,extensions:[basicSetup,latexKeymap,search({top:true}),keymap.of(searchKeymap),lintGutter(),StreamLanguage.define(stex),texCompletion(()=>model.autoClose!==false),autocompletion({override:[latexCompletionSource],defaultKeymap:true,activateOnTyping:true,maxRenderedOptions:50}),EditorView.lineWrapping,themeCompartment.of(getThemeExtensions(currentThemeSetting,computeIsDark())),
   EditorView.domEventHandlers({beforeinput(event,editor){
     markInput();
     const input=event as InputEvent;
@@ -352,6 +695,7 @@ function createState(text:string){
     event.preventDefault();
     if(input.data==='\\'&&model.autoClose!==false&&!editor.state.selection.main.empty&&editor.state.selection.ranges.length===1){showSurround(editor);return true;}
     editor.dispatch({...completeTex(editor.state,input.data,model.autoClose!==false),annotations:Transaction.userEvent.of('input.type'),scrollIntoView:true});
+    if(['\\','@','{',','].includes(input.data)||/[a-zA-Z]/.test(input.data)){queueMicrotask(()=>{if(view===editor)startCompletion(editor);});}
     return true;
   },pointerdown(event,editor){pointerGeneration++;pointer=event.button===0&&textHit(event,editor)?{id:event.pointerId,x:event.clientX,y:event.clientY}:undefined;return false;},pointerup(event,editor){const start=pointer;pointer=undefined;if(!start||start.id!==event.pointerId||!textHit(event,editor)||Math.abs(start.x-event.clientX)>4||Math.abs(start.y-event.clientY)>4){pointerGeneration++;renderRecoveryNotice();return false;}if(model.continuousPreview&&!suppressFollow){const generation=++pointerGeneration,doc=editor.state.doc,at=editor.state.selection.main.head;cancelAnimationFrame(followFrame);followFrame=requestAnimationFrame(()=>{if(generation===pointerGeneration&&view===editor&&editor.state.doc===doc&&editor.state.selection.main.head===at)void locateSource(true).catch(e=>{el('navState').textContent=String(e);});});}return false;},scroll(){renderRecoveryNotice();return false;},wheel(){pointer=undefined;pointerGeneration++;return false;},paste(event){if(imagePasteEvent(event))return true;markInput();return false;},cut(){markInput();return false;}}),EditorView.updateListener.of(update=>{
   if(applyingProjectReplace)return;
@@ -394,6 +738,21 @@ function activateDocumentTab(file:string){
  });
  void tabActivationChain.catch(report);
 }
+function closeTab(file?:string){
+ const target=file||active;
+ if(!target)return;
+ const token=++tabActivationToken;
+ tabActivationChain=tabActivationChain.catch(()=>{}).then(async()=>{
+  if(token!==tabActivationToken)return;
+  try{await flush();}catch(error){report(error);}
+  if(token!==tabActivationToken)return;
+  const next=await api.call('closeTab',target);
+  if(token!==tabActivationToken)return;
+  model=next;renderEditor();
+  if(view&&active)void api.call('localCursor',active,view.state.selection.main.head).catch(report);
+ });
+ void tabActivationChain.catch(report);
+}
 function renderTabs(){
   projectSidebar.update(model);
   el<HTMLSelectElement>('previewMode').value=model.previewMode==='lecture'?'lecture':'document';
@@ -403,7 +762,7 @@ function renderTabs(){
   updateMathTools();
   toolbarButton('editPreview','edit',model.previewEditing?'Edit preview: on':'Edit verified text and math in preview');el('editPreview').setAttribute('aria-pressed',String(!!model.previewEditing));
   el<HTMLSelectElement>('layoutMode').value=model.continuousPreview?'continuous':'paged';
-  el('prevPage').hidden=el('nextPage').hidden=!!model.continuousPreview;
+  el('prevPage').hidden=el('nextPage').hidden=false;
   el<HTMLButtonElement>('editPreview').disabled=!!model.continuousPreview;
   el('editPreview').title=model.continuousPreview?'Switch to Paged PDF to edit the verified preview':'Edit verified text and supported math';
   toolbarButton('follow','follow',model.followPreview?'Follow typing: on. Keep source cursor visible in PDF':'Follow typing: off. Keep source cursor visible in PDF');el('follow').setAttribute('aria-pressed',String(!!model.followPreview));
@@ -411,7 +770,23 @@ function renderTabs(){
   const statusVisible=model.statusBar!==false;el('statusBar').hidden=false;el('statusDetails').hidden=!statusVisible;document.body.dataset.statusBar=statusVisible?'visible':'hidden';toolbarButton('toggleStatus','status',statusVisible?'Hide preview timing details':'Show preview timing details');el('toggleStatus').setAttribute('aria-pressed',String(statusVisible));
   toolbarSelect('panelLayout','panels','Panel layout: '+el<HTMLSelectElement>('panelLayout').selectedOptions[0]?.textContent);toolbarSelect('layoutMode','pages',model.continuousPreview?'Preview layout: Continuous scroll':'Preview layout: Paged PDF');
   el('tabs').replaceChildren();
-  for(const doc of model.docs){const button=document.createElement('button');button.textContent=doc.path.split(/[\\/]/).at(-1)+(doc.dirty?' •':'');button.title=doc.path;button.className=doc.path===active?'active':'';button.onclick=()=>activateDocumentTab(doc.path);el('tabs').append(button);}
+  for(const doc of model.docs){
+    const tabEl=document.createElement('div');
+    tabEl.className='tab-item'+(doc.path===active?' active':'');
+    const button=document.createElement('button');
+    button.className='tab-title';
+    button.textContent=doc.path.split(/[\\/]/).at(-1)+(doc.dirty?' •':'');
+    button.title=doc.path;
+    button.onclick=()=>activateDocumentTab(doc.path);
+    const closeBtn=document.createElement('button');
+    closeBtn.className='tab-close';
+    closeBtn.title='Close tab (Cmd+W)';
+    closeBtn.setAttribute('aria-label','Close tab');
+    closeBtn.textContent='×';
+    closeBtn.onclick=(e)=>{e.stopPropagation();closeTab(doc.path);};
+    tabEl.append(button,closeBtn);
+    el('tabs').append(tabEl);
+  }
   el('rootLabel').textContent=model.root?'Root: '+model.root:'No root selected';
   renderRecoveryNotice();
 }
@@ -428,6 +803,10 @@ function renderEditor(){
     if(view)view.setState(state);else view=new EditorView({state,parent:el('editor')});
     if(restored!==undefined)view.dispatch({effects:EditorView.scrollIntoView(restored,{y:'center'})});
     el('welcome').hidden=true;
+  } else {
+    active='';
+    if(view){view.destroy();view=undefined;}
+    el('welcome').hidden=false;
   }
   renderTabs();renderIssue();
 }
@@ -519,7 +898,11 @@ el('toggleLog').onclick=()=>{const log=el<HTMLDetailsElement>('logs');log.open=!
 el('autoClose').onclick=()=>void command(async()=>{model.autoClose=model.autoClose===false;renderTabs();await api.call('autoClose',model.autoClose);});
 document.addEventListener('keydown',event=>{
   if((event.ctrlKey||event.metaKey)&&event.key==='Enter'){event.preventDefault();event.stopPropagation();void locateSource(true).catch(e=>{el('navState').textContent=String(e);});}
-  if(event.ctrlKey||event.metaKey){const key=event.key.toLowerCase();if(['s','b','o'].includes(key)){event.preventDefault();el(key==='s'?'save':key==='b'?'build':'open').click();}}
+  if(event.ctrlKey||event.metaKey){
+    const key=event.key.toLowerCase();
+    if(key==='w'){event.preventDefault();event.stopPropagation();closeTab();return;}
+    if(['s','b','o'].includes(key)){event.preventDefault();el(key==='s'?'save':key==='b'?'build':'open').click();}
+  }
 },{capture:true});
 function renderToolchain(report:any,activeReport=false){
  if(!report)return;
@@ -527,7 +910,7 @@ function renderToolchain(report:any,activeReport=false){
  el<HTMLButtonElement>('prepareFastFormat').disabled=!report.fast.preparable||report.fast.available;
  el('toolchainDetails').textContent=[...report.tools.map((t:any)=>(t.ok?'OK: ':'Missing/unusable: ')+t.name+' '+(t.path??'')+'\n'+t.detail),...report.packages.map((p:any)=>(p.found?'Found: ':'Missing: ')+p.name),...report.issues].join('\n\n');
  const choices=el('texInstallations');choices.replaceChildren();for(const installation of report.installations){const option=document.createElement('option');option.value=installation.bin;choices.append(option);}
- if(activeReport){const notice=el('toolchainNotice');notice.hidden=report.ready&&report.fast.available;
+ if(activeReport){const notice=el('toolchainNotice');notice.hidden=toolchainNoticeDismissed||(report.ready&&report.fast.available);
  el('toolchainNoticeText').textContent=report.ready?report.fast.reason:'TeX tools need attention. Open Build settings to select an installation and check missing tools.';}
 }
 async function refreshToolchain(detect=false){
@@ -535,19 +918,117 @@ async function refreshToolchain(detect=false){
  const input=el<HTMLInputElement>('texBin');if(detect)input.value='';el('toolchainSummary').textContent='Checking installed TeX tools…';
  const report=await api.call('toolchainCheck',input.value,el<HTMLSelectElement>('engine').value,el<HTMLInputElement>('latexmk').value);if(report.selected)input.value=report.selected;renderToolchain(report);
 }
-el('settings').onclick=()=>{
-  el('formatPreparation').textContent='';
-  el<HTMLSelectElement>('engine').value=model.engine;el<HTMLInputElement>('latexmk').value=model.latexmk;el<HTMLInputElement>('onSave').checked=model.onSave;
-  el<HTMLInputElement>('texBin').value=model.texBin??model.toolchain?.selected??'';renderToolchain(model.toolchain);
+function applyFontSize(size: string) {
+  const n = parseInt(size, 10) || 14;
+  const styleEl = el('editorFontSizeStyle') || (() => {
+    const s = document.createElement('style');
+    s.id = 'editorFontSizeStyle';
+    document.head.appendChild(s);
+    return s;
+  })();
+  styleEl.textContent = `.cm-editor { font-size: ${n}px !important; }`;
+  const sel = el<HTMLSelectElement>('prefFontSize');
+  if (sel) sel.value = String(n);
+  try { localStorage.setItem('texquisite_font_size', String(n)); } catch {}
+}
+applyFontSize(localStorage.getItem('texquisite_font_size') || '14');
+
+document.querySelectorAll<HTMLButtonElement>('.settings-tabs .tab-btn').forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll('.settings-tabs .tab-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const target = btn.dataset.tab;
+    document.querySelectorAll('.settings-tab-pane').forEach(p => (p as HTMLElement).hidden = p.id !== target);
+  };
+});
+el('closeSettingsX').onclick = () => el<HTMLDialogElement>('settingsDialog').close();
+el('cancelSettings').onclick = () => el<HTMLDialogElement>('settingsDialog').close();
+
+el<HTMLSelectElement>('prefFontSize').onchange = () => {
+  applyFontSize(el<HTMLSelectElement>('prefFontSize').value);
+};
+el<HTMLSelectElement>('prefTheme').onchange = () => void command(async () => {
+  const theme = el<HTMLSelectElement>('prefTheme').value as any;
+  model.theme = await api.call('theme', theme);
+  applyTheme(model.theme);
+});
+el<HTMLInputElement>('prefPdfInvert').onchange = () => void command(async () => {
+  const invert = el<HTMLInputElement>('prefPdfInvert').checked;
+  model.pdfInvert = await api.call('pdfInvert', invert);
+  applyTheme(undefined, model.pdfInvert);
+});
+el<HTMLInputElement>('prefAutoClose').onchange = () => {
+  model.autoClose = el<HTMLInputElement>('prefAutoClose').checked;
+  const btn = el('autoClose');
+  if (btn) btn.textContent = model.autoClose ? 'Match pairs: on' : 'Match pairs: off';
+};
+el<HTMLInputElement>('prefFollowPreview').onchange = () => {
+  model.followPreview = el<HTMLInputElement>('prefFollowPreview').checked;
+  const btn = el('follow');
+  if (btn) {
+    btn.setAttribute('aria-pressed', String(model.followPreview));
+    btn.textContent = model.followPreview ? 'Follow typing: on' : 'Follow typing: off';
+  }
+};
+el<HTMLInputElement>('prefPreviewEditing').onchange = () => void command(async () => {
+  model.previewEditing = await api.call('previewEditing', el<HTMLInputElement>('prefPreviewEditing').checked);
+  const btn = el('editPreview');
+  if (btn) {
+    btn.setAttribute('aria-pressed', String(model.previewEditing));
+    btn.textContent = model.previewEditing ? 'Edit preview: on' : 'Edit preview: off';
+  }
+});
+const settingsBackupNow = el('settingsBackupNow');
+if (settingsBackupNow) settingsBackupNow.onclick = () => void command(backupNow);
+const settingsReviewBackups = el('settingsReviewBackups');
+if (settingsReviewBackups) settingsReviewBackups.onclick = () => void command(showBackups);
+
+el('settings').onclick = () => {
+  el('formatPreparation').textContent = '';
+  el<HTMLSelectElement>('prefTheme').value = currentThemeSetting;
+  el<HTMLInputElement>('prefPdfInvert').checked = currentPdfInvert;
+  el<HTMLInputElement>('prefAutoClose').checked = model.autoClose !== false;
+  el<HTMLInputElement>('prefFollowPreview').checked = !!model.followPreview;
+  el<HTMLInputElement>('prefPreviewEditing').checked = !!model.previewEditing;
+  el<HTMLSelectElement>('engine').value = model.engine;
+  el<HTMLInputElement>('latexmk').value = model.latexmk;
+  el<HTMLInputElement>('onSave').checked = model.onSave;
+  el<HTMLInputElement>('texBin').value = model.texBin ?? model.toolchain?.selected ?? '';
+  renderToolchain(model.toolchain);
   el<HTMLDialogElement>('settingsDialog').showModal();
 };
-el('cleanCaches').onclick=()=>void command(async()=>{const button=el<HTMLButtonElement>('cleanCaches');button.disabled=true;el('cacheStatus').textContent='Cleaning unused caches…';try{const result=await api.call('cleanCaches');el('cacheStatus').textContent=result.text;}finally{button.disabled=false;}});
-el('applySettings').onclick=event=>{event.preventDefault();void command(async()=>{
-  model=await api.call('settings',{texBin:el<HTMLInputElement>('texBin').value,engine:el<HTMLSelectElement>('engine').value,latexmk:el<HTMLInputElement>('latexmk').value,onSave:el<HTMLInputElement>('onSave').checked});
-  renderToolchain(model.toolchain,true);
-  renderTabs();
-  el<HTMLDialogElement>('settingsDialog').close();
-});};
+
+el('cleanCaches').onclick = () => void command(async () => {
+  const button = el<HTMLButtonElement>('cleanCaches');
+  button.disabled = true;
+  el('cacheStatus').textContent = 'Cleaning unused caches…';
+  try {
+    const result = await api.call('cleanCaches');
+    el('cacheStatus').textContent = result.text;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+el('applySettings').onclick = event => {
+  event.preventDefault();
+  void command(async () => {
+    const themeVal = el<HTMLSelectElement>('prefTheme').value as any;
+    const invertVal = el<HTMLInputElement>('prefPdfInvert').checked;
+    model = await api.call('settings', {
+      texBin: el<HTMLInputElement>('texBin').value,
+      engine: el<HTMLSelectElement>('engine').value,
+      latexmk: el<HTMLInputElement>('latexmk').value,
+      onSave: el<HTMLInputElement>('onSave').checked,
+      theme: themeVal,
+      pdfInvert: invertVal
+    });
+    applyTheme(themeVal, invertVal);
+    renderToolchain(model.toolchain, true);
+    renderTabs();
+    el<HTMLDialogElement>('settingsDialog').close();
+  });
+};
 
 let current:any,prepared:any,pageNumber=1,scale=1,renderToken=0,loadToken=0;
 el('detectTeX').onclick=()=>void command(()=>refreshToolchain(true));
@@ -560,10 +1041,92 @@ el('prepareFastFormat').onclick=()=>void command(async()=>{
 el('browseTeX').onclick=()=>void command(async()=>{const report=await api.call('toolchainBrowse',el<HTMLSelectElement>('engine').value,el<HTMLInputElement>('latexmk').value);if(report){el<HTMLInputElement>('texBin').value=report.selected??report.requested??'';renderToolchain(report);}});
 el('toolchainNoticeSettings').onclick=()=>el('settings').click();
 const continuousView=new ContinuousView(el('pages'),el('pdfViewport'));
-el('pdfViewport').addEventListener('scroll',()=>renderRecoveryNotice(),{passive:true});
+el('pdfViewport').addEventListener('scroll',()=>{
+  renderRecoveryNotice();
+  if(model.continuousPreview&&current?.pdf){
+    const vis=continuousView.visiblePage;
+    if(vis&&vis!==pageNumber){
+      pageNumber=vis;
+      el('pageLabel').textContent=`${vis} / ${current.pdf.numPages}`;
+    }
+  }
+},{passive:true});
+let mouseZoomTimer=0;
+el('pdfViewport').addEventListener('wheel',(event:WheelEvent)=>{
+  if(event.ctrlKey||event.metaKey){
+    event.preventDefault();
+    const viewport=el('pdfViewport');
+    const rect=viewport.getBoundingClientRect();
+    const mouseX=event.clientX-rect.left;
+    const mouseY=event.clientY-rect.top;
+    const contentX=viewport.scrollLeft+mouseX;
+    const contentY=viewport.scrollTop+mouseY;
+
+    const oldScale=scale;
+    let zoomStep:number;
+    if(Math.abs(event.deltaY)>=40){
+      zoomStep=event.deltaY<0?1.12:0.89;
+    }else{
+      zoomStep=Math.max(0.85,Math.min(1.20,1-event.deltaY*0.015));
+    }
+    const newScale=Math.max(0.25,Math.min(4.0,Math.round(oldScale*zoomStep*100)/100));
+    if(Math.abs(newScale-oldScale)<0.005)return;
+
+    zoomChoice=newScale;
+    adoptZoom(newScale);
+    viewport.scrollLeft=contentX*(newScale/oldScale)-mouseX;
+    viewport.scrollTop=contentY*(newScale/oldScale)-mouseY;
+
+    clearTimeout(mouseZoomTimer);
+    mouseZoomTimer=window.setTimeout(async()=>{
+      if(!current)return;
+      try{
+        const canvas=await render(current.pdf,current.page);
+        copyCanvasMetadata(canvas,current.canvas);
+        current={...current,canvas};
+        show(current);
+        void api.call('zoom',zoomChoice).catch(()=>{});
+      }catch(e){
+        console.debug('Mouse zoom refresh error',e);
+      }
+    },150);
+    return;
+  }
+
+  if(!model.continuousPreview&&current?.pdf){
+    const viewport=el('pdfViewport');
+    const atBottom=viewport.scrollTop+viewport.clientHeight>=viewport.scrollHeight-4;
+    const atTop=viewport.scrollTop<=4;
+    if(event.deltaY>50&&atBottom)void navigate(1);
+    else if(event.deltaY<-50&&atTop)void navigate(-1);
+  }
+},{passive:false});
 let continuousSetup:Promise<void>=Promise.resolve();
 let zoomChoice:number|'fit-width'=1,zoomChange=0,fitTimer=0,fitWidthSeen=0;
-function zoomLabel(){toolbarSelect('zoom','zoom',zoomChoice==='fit-width'?`Fit width: ${Math.round(scale*100)}%`:`Preview zoom: ${Math.round(scale*100)}%`);document.body.dataset.previewScale=String(scale);}
+function zoomLabel(){
+  const pct=Math.round(scale*100);
+  toolbarSelect('zoom','zoom',zoomChoice==='fit-width'?`Fit width: ${pct}%`:`Preview zoom: ${pct}%`);
+  document.body.dataset.previewScale=String(scale);
+  const select=el<HTMLSelectElement>('zoom');
+  if(zoomChoice==='fit-width'){
+    select.value='fit-width';
+  }else{
+    const match=Array.from(select.options).find(opt=>Math.abs(parseFloat(opt.value)-scale)<0.02);
+    if(match){
+      select.value=match.value;
+    }else{
+      let customOpt=select.querySelector<HTMLOptionElement>('option[data-custom="true"]');
+      if(!customOpt){
+        customOpt=document.createElement('option');
+        customOpt.dataset.custom='true';
+        select.appendChild(customOpt);
+      }
+      customOpt.value=String(scale);
+      customOpt.textContent=`${pct}%`;
+      select.value=String(scale);
+    }
+  }
+}
 async function desiredZoom(pdf:any){
   if(zoomChoice!=='fit-width')return zoomChoice;
   const sizes=await pdf.sizes(),width=Math.max(...sizes.map((size:any)=>Number(size.originalWidth)));
@@ -608,10 +1171,10 @@ async function displayFocusLocation(hint:PreviewFocus|undefined,nav:Navigation):
  if(view&&file===active&&file===model.root&&prefix!==undefined&&prefix===previewFocusPrefix(hint,file,view.state.doc.toString(),view.state.selection.main.head)&&model.followPreview&&model.continuousPreview)return row;
 }
 async function cursorLocation(nav:Navigation,page:number,bundleId?:string):Promise<Region|undefined>{
-  if(!view)return;const file=active,text=view.state.doc.toString(),head=view.state.selection.main.head,line=view.state.doc.lineAt(head).number;
-  if(!sourceLineHasOutput(view.state.doc.lineAt(head).text))return;
+  if(!view)return;const file=active,text=view.state.doc.toString(),head=view.state.selection.main.head,lineObj=view.state.doc.lineAt(head),line=lineObj.number,column=head-lineObj.from;
+  if(!sourceLineHasOutput(lineObj.text))return;
   if(!await matchesSource(nav,file,text)||file!==active||text!==view.state.doc.toString()||head!==view.state.selection.main.head)return;
-  if(nav.nativeInputs&&bundleId)return api.call('nativeNavigation',bundleId,'forward',{file,line,page});
+  if(nav.nativeInputs&&bundleId)return api.call('nativeNavigation',bundleId,'forward',{file,line,column,page});
   return forwardPosition(nav,file,text,head,page);
 }
 function markLocation(row:Region,highlight=true){
@@ -750,7 +1313,7 @@ function show(candidate:any,reconcileBands=false){
     viewport.scrollTop=old*Math.max(1,viewport.scrollHeight-viewport.clientHeight);viewport.scrollLeft=left;
   }
   el('empty').hidden=true;pageNumber=candidate.page;
-  el('pageLabel').textContent=model.continuousPreview?'Continuous':`${pageNumber} / ${candidate.pdf.numPages}`;
+  el('pageLabel').textContent=`${continuousView.visiblePage??pageNumber} / ${candidate.pdf.numPages}`;
 }
 async function navigate(delta:number){
   if(model.continuousPreview&&delta!==0){pageNumber=Math.max(1,Math.min(current?.pdf.numPages??1,pageNumber+delta));continuousView.scroll(pageNumber);el('pageLabel').textContent=`${pageNumber} / ${current?.pdf.numPages??'…'}`;return;}
@@ -768,6 +1331,44 @@ async function navigate(delta:number){
   try{const canvas=await render(candidate.pdf,page);if(token!==renderToken){canvas.width=canvas.height=0;return;}copyCanvasMetadata(canvas,candidate.canvas);current={...current,canvas,page};show(current);if(!model.continuousPreview)candidate.canvas.width=candidate.canvas.height=0;}catch(e){report('Page rendering failed. Previous display retained. '+e);}
 }
 el('prevPage').onclick=()=>void navigate(-1);el('nextPage').onclick=()=>void navigate(1);
+const zoomSteps=[0.8, 1, 1.25, 1.5, 2];
+function setZoom(val:number|'fit-width'){
+  const select=el<HTMLSelectElement>('zoom');
+  select.value=String(val);
+  select.dispatchEvent(new Event('change',{bubbles:true}));
+}
+function stepZoom(direction: 1|-1){
+  const currentVal=typeof zoomChoice==='number'?zoomChoice:1;
+  let nextVal:number;
+  if(direction>0)nextVal=zoomSteps.find(z=>z>currentVal+0.01)??zoomSteps[zoomSteps.length-1];
+  else nextVal=[...zoomSteps].reverse().find(z=>z<currentVal-0.01)??zoomSteps[0];
+  setZoom(nextVal);
+}
+const themesList: Array<'auto'|'dark'|'midnight'|'nord'|'light'|'warm'> = ['auto', 'dark', 'midnight', 'nord', 'light', 'warm'];
+el('toggleTheme').onclick = () => void command(async () => {
+  const currentIndex = themesList.indexOf(currentThemeSetting);
+  const next = themesList[(currentIndex + 1) % themesList.length];
+  model.theme = await api.call('theme', next);
+  applyTheme(model.theme);
+});
+el('togglePdfInvert').onclick = () => void command(async () => {
+  model.pdfInvert = await api.call('togglePdfInvert');
+  applyTheme(undefined, model.pdfInvert);
+});
+const openFolder = async () => {
+  const next = await api.call('openFolder');
+  if (next) {
+    model = next;
+    renderEditor();
+    projectSidebar.update(model);
+    void projectSidebar.refresh();
+    void refreshBibEntries();
+  }
+};
+const openFolderHeader = el('openFolderHeader');
+if (openFolderHeader) openFolderHeader.onclick = () => void command(openFolder);
+const welcomeOpen = el('welcomeOpenFolder');
+if (welcomeOpen) welcomeOpen.onclick = () => void command(openFolder);
 el<HTMLSelectElement>('zoom').onchange=()=>{const value=el<HTMLSelectElement>('zoom').value;zoomChoice=value==='fit-width'?value:Number(value);model.zoom=zoomChoice;zoomLabel();void api.call('zoom',zoomChoice).catch(report);void applyZoom().catch(report);};
 el<HTMLSelectElement>('layoutMode').onchange=()=>void command(async()=>{await flush();if(retainedExperiment)canonicalRequested=true;model.continuousPreview=await api.call('continuous',el<HTMLSelectElement>('layoutMode').value==='continuous');if(model.continuousPreview){model.previewEditing=false;endPreview();}localRenderToken++;if(current&&!(retainedExperiment&&localCanvas)){const canvas=await render(current.pdf,current.page);copyCanvasMetadata(canvas,current.canvas);current={...current,canvas};show(current);}renderTabs();});
 el<HTMLSelectElement>('previewMode').onchange=()=>{const mode=el<HTMLSelectElement>('previewMode').value;void command(async()=>{await flush();if(mode==='document')canonicalRequested=true;model=await api.call('previewMode',mode);renderTabs();refreshPreviewStatus();});};
@@ -778,14 +1379,26 @@ const pageProofKey=(message:any)=>{const span=message.baselineSpan??message.page
 function mayShowLocal(message:any){
   const file=message.sourceFile??message.root,input=localInputs.get(message.editId),latest=latestEdit&&localInputs.get(latestEdit.id),text=model.docs.find((doc:any)=>doc.path===file)?.text;
   if(!input||input.file!==file||latest?.file!==file||input.sequence<=displayedSequence||message.root!==model.root||model.previewEditing||!model.onSave||typeof text!=='string')return false;
-  if(!message.sourceFile&&current?.canvas.dataset.sourceHash===message.sourceHash&&!message.flowOutput&&!message.neutralBlock)return false;
-  if(!model.followPreview&&!message.flowOutput&&!(model.continuousPreview&&(message.pageOutput||message.neutralBlock))){const s=message.pageOutput?message.sourcePages:undefined;if(s?(pageNumber<s.first||pageNumber>s.last):pageNumber!==message.page)return false;}
+  if(!model.continuousPreview&&!model.followPreview&&!message.flowOutput){const s=message.pageOutput?message.sourcePages:undefined;if(s?(pageNumber<s.first||pageNumber>s.last):pageNumber!==message.page)return false;}
   const {rangeFrom:from,rangeTo:to}=message;if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||from<0||to<from||to>input.text.length)return false;
   const prefix=input.text.slice(0,from),suffix=input.text.slice(to);return text.length>=prefix.length+suffix.length&&text.startsWith(prefix)&&text.endsWith(suffix);
 }
 function tileCanvas(tile:any){const canvas=document.createElement('canvas');canvas.width=tile.width;canvas.height=tile.height;
-  if(tile.image){const target=canvas.getContext('bitmaprenderer');if(target)target.transferFromImageBitmap(tile.image);else{canvas.getContext('2d')!.drawImage(tile.image,0,0);tile.image.close();}}
-  else canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(tile.data.buffer,tile.data.byteOffset,tile.data.byteLength),tile.width,tile.height),0,0);return canvas;}
+  const ctx=canvas.getContext('2d')!;
+  if(tile.image){ctx.drawImage(tile.image,0,0);tile.image.close();}
+  else if(tile.data)ctx.putImageData(new ImageData(new Uint8ClampedArray(tile.data.buffer,tile.data.byteOffset,tile.data.byteLength),tile.width,tile.height),0,0);
+  return canvas;}
+function drawTile(ctx:CanvasRenderingContext2D,tile:any,dx=tile.x,dy=tile.y){
+  if(tile.image){
+    ctx.drawImage(tile.image,tile.sourceX,tile.sourceY,tile.patchWidth,tile.patchHeight,dx,dy,tile.patchWidth,tile.patchHeight);
+    tile.image.close();
+  }else if(tile.data){
+    const tmp=document.createElement('canvas');tmp.width=tile.width;tmp.height=tile.height;
+    tmp.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(tile.data.buffer,tile.data.byteOffset,tile.data.byteLength),tile.width,tile.height),0,0);
+    ctx.drawImage(tmp,tile.sourceX,tile.sourceY,tile.patchWidth,tile.patchHeight,dx,dy,tile.patchWidth,tile.patchHeight);
+    tmp.width=tmp.height=0;
+  }
+}
 async function tileMatchesFull(pdf:any,box:any,full:{width:number;height:number},pixels:Uint8ClampedArray,preparedTile?:any){
   const tile=preparedTile??await pdf.regionPixels(1,box,scale,window.devicePixelRatio||1),data=tile.data;let equal=tile.fullWidth===full.width&&tile.fullHeight===full.height;
   for(let y=0;y<tile.patchHeight&&equal;y++)for(let x=0;x<tile.patchWidth&&equal;x++){const a=((y+tile.sourceY)*tile.width+x+tile.sourceX)*4,b=((y+tile.y)*full.width+x+tile.x)*4;for(let c=0;c<4;c++)if(data[a+c]!==pixels[b+c]){equal=false;break;}}
@@ -928,7 +1541,7 @@ api.on(async message=>{
         if(tile.safe!==true)throw Error('Continuous block ink exceeds its bounds.');
         await continuousSetup;
         if(token!==localRenderToken||!mayShowLocal(message)){tile.image?.close();return;}
-        if(continuousView.id!==message.baseId||!continuousView.matchesScale(scale,window.devicePixelRatio||1)){
+        if(continuousView.id!==message.baseId||!continuousView.matchesScale(scale)){
           const held=proof.retain(),baseline=await held.document;releaseContinuousLease();continuousLease={id:message.baseId,task:{destroy:async()=>held.release()}};
           const copy=document.createElement('canvas');copy.width=proof.canvas.width;copy.height=proof.canvas.height;copy.style.width=proof.canvas.style.width;copy.style.height=proof.canvas.style.height;copy.getContext('2d')!.drawImage(proof.canvas,0,0);
           continuousBasis=continuousBases.get(message.baseId);
@@ -963,7 +1576,7 @@ api.on(async message=>{
         canvas.dataset.localRecovered=String(!!message.recovery||!!message.recoveredBasis);
         canvas.dataset.localPipeline=JSON.stringify({compiler:message.timing,receiveMs:receivedAt-inputAt,checkedRegionMs:tiledAt-receivedAt,pdfWorker:{queueMs:tile.queueMs,loadMs:tile.loadMs,rasterMs:tile.rasterMs,checkMs:tile.checkMs,cropMs:tile.cropMs,workerMs:tile.workerMs,rasterPasses:tile.rasterPasses},canvasMs:performance.now()-tiledAt});
         if(model.followPreview&&Number.isFinite(message.flowOutput.caretY))continuousView.reveal(canvas,message.flowOutput.caretY+leadingCorrection);
-        const finish=()=>{if(token!==localRenderToken||localCanvas!==canvas)return;const latency=Math.ceil(performance.now()-inputAt);input.displayedLatencyMs??=latency;canvas.dataset.localLatencyMs=String(latency);canvas.dataset.localLatencyEditId=message.editId;canvas.dataset.timingEndpoint=message.visible?'paint opportunity':'canvas (window hidden)';void api.call('localWarm',message.root,message.baseId,message.editId,Math.ceil(performance.now()-inputAt),canvas.dataset.localLayout).catch(()=>{});localStatus=`Continuous block updated in ${latency} ms from edit. Paginated PDF verification pending.`;refreshPreviewStatus();};
+        const finish=()=>{if(token!==localRenderToken||localCanvas!==canvas)return;const latency=Math.ceil(performance.now()-inputAt);input.displayedLatencyMs??=latency;canvas.dataset.localLatencyMs=String(latency);canvas.dataset.localLatencyEditId=message.editId;canvas.dataset.timingEndpoint=message.visible?'paint opportunity':'canvas (window hidden)';void api.call('localWarm',message.root,message.baseId,message.editId,Math.ceil(performance.now()-inputAt),canvas.dataset.localLayout).catch(()=>{});localStatus=`Continuous block updated in ${latency} ms from edit.`;refreshPreviewStatus();};
         if(message.visible)requestAnimationFrame(()=>requestAnimationFrame(finish));else finish();return;
       }
       if(message.pageOutput){
@@ -988,7 +1601,7 @@ api.on(async message=>{
             const failed=rasters.find(r=>r.status==='rejected');if(failed?.status==='rejected')throw failed.reason;
             await continuousSetup;
             if(token!==localRenderToken||!mayShowLocal(message))return;
-            if(continuousView.id!==message.baseId||!continuousView.matchesScale(scale,window.devicePixelRatio||1)){
+            if(continuousView.id!==message.baseId||!continuousView.matchesScale(scale)){
               const baseline=await proof.document,copy=await render(baseline,span.first);
               if(token!==localRenderToken||!mayShowLocal(message)){copy.width=copy.height=0;return;}
               // The proof owns this PDF until local invalidation. The view
@@ -1010,7 +1623,7 @@ api.on(async message=>{
               const page=Math.max(span.first,Math.min(span.last,message.cursorPage??span.first)),target=message.cursorPosition;
               continuousView.reveal(canvases[page-proof.span.first],target?.page===page?target.y+target.height:0);
             }
-            const finish=()=>{if(token!==localRenderToken||localCanvas!==canvas)return;const latency=Math.ceil(performance.now()-inputAt);input.displayedLatencyMs??=latency;for(const c of painted){c.dataset.localLatencyMs=String(latency);c.dataset.localLatencyEditId=message.editId;}void api.call('localWarm',message.root,message.baseId,message.editId,latency,canvas.dataset.localLayout).catch(()=>{});localStatus=`Affected pages updated in ${latency} ms from edit. Full document verification pending.`;refreshPreviewStatus();};
+            const finish=()=>{if(token!==localRenderToken||localCanvas!==canvas)return;const latency=Math.ceil(performance.now()-inputAt);input.displayedLatencyMs??=latency;for(const c of painted){c.dataset.localLatencyMs=String(latency);c.dataset.localLatencyEditId=message.editId;}void api.call('localWarm',message.root,message.baseId,message.editId,latency,canvas.dataset.localLayout).catch(()=>{});localStatus=`Affected pages updated in ${latency} ms from edit.`;refreshPreviewStatus();};
             if(message.visible)requestAnimationFrame(()=>requestAnimationFrame(finish));else finish();
             canvases.length=0;return;
           }finally{for(const c of canvases)c.width=c.height=0;}
@@ -1024,7 +1637,7 @@ api.on(async message=>{
         canvas.dataset.localFirstPage=String(span.first);canvas.dataset.localLastPage=String(span.last);el('pages').replaceChildren(canvas);el('empty').hidden=true;pageNumber=page;el('pageLabel').textContent=`${pageNumber} / …`;
         canvas.dataset.localRecovered=String(!!message.recovery||!!message.recoveredBasis);
         if(model.followPreview&&message.cursorPosition)continuousView.reveal(canvas,message.cursorPosition.y+message.cursorPosition.height,scale);
-        const finish=()=>{if(token!==localRenderToken||localCanvas!==canvas||canvas.dataset.localEditId!==message.editId)return;void api.call('localWarm',message.root,message.baseId,message.editId,Math.ceil(performance.now()-inputAt),canvas.dataset.localLayout).catch(()=>{});const latency=Math.ceil(performance.now()-inputAt);input.displayedLatencyMs??=latency;canvas.dataset.localLatencyMs=String(latency);canvas.dataset.localLatencyEditId=message.editId;canvas.dataset.timingEndpoint=message.visible?'paint opportunity':'canvas (window hidden)';localStatus=`Affected ${span.last>span.first?'pages':'page'} updated in ${latency} ms from edit. Full document verification pending.`+(!message.visible?' Window hidden; measured to canvas.':'');refreshPreviewStatus();};
+        const finish=()=>{if(token!==localRenderToken||localCanvas!==canvas||canvas.dataset.localEditId!==message.editId)return;void api.call('localWarm',message.root,message.baseId,message.editId,Math.ceil(performance.now()-inputAt),canvas.dataset.localLayout).catch(()=>{});const latency=Math.ceil(performance.now()-inputAt);input.displayedLatencyMs??=latency;canvas.dataset.localLatencyMs=String(latency);canvas.dataset.localLatencyEditId=message.editId;canvas.dataset.timingEndpoint=message.visible?'paint opportunity':'canvas (window hidden)';localStatus=`Affected ${span.last>span.first?'pages':'page'} updated in ${latency} ms from edit.`+(!message.visible?' Window hidden; measured to canvas.':'');refreshPreviewStatus();};
         if(message.visible)requestAnimationFrame(()=>requestAnimationFrame(finish));else finish();return;
       }
       if(!localProofs.has(proofKey(message)))throw Error('Local preview needs verification at this zoom.');
@@ -1043,13 +1656,13 @@ api.on(async message=>{
           const baselineText=continuousBasis?.texts?.[input.file]??(input.file===model.root?continuousBasis?.text:undefined);if(baselineText===undefined)throw Error('Retained source baseline is unavailable.');
           const nextNavigation=retainedNavigation.updated({root:message.root,file:input.file,baseId:message.baseId,sourceHash:message.sourceHash,editId:message.editId,text:input.text},baselineText,{...block,page:message.page},continuousBasis?.navigation);
           await continuousSetup;
-          if(continuousView.id!==message.baseId||!continuousView.matchesScale(scale,window.devicePixelRatio||1)){
+          if(continuousView.id!==message.baseId||!continuousView.matchesScale(scale)){
             if(neutralIds.size)throw Error('Neutral display scale changed.');
             const held=proof.retain(),baseline=await held.document;releaseContinuousLease();continuousLease={id:message.baseId,task:{destroy:async()=>held.release()}};
             const copy=document.createElement('canvas');copy.width=proof.canvas.width;copy.height=proof.canvas.height;copy.style.width=proof.canvas.style.width;copy.style.height=proof.canvas.style.height;copy.getContext('2d')!.drawImage(proof.canvas,0,0);continuousSetup=continuousView.show(message.baseId,baseline,copy,message.page,scale,window.devicePixelRatio||1);await continuousSetup;
           }
           if(token!==localRenderToken||!mayShowLocal(message)){tile.image?.close();return;}
-          const region=tileCanvas(tile);let canvas:HTMLCanvasElement;try{canvas=continuousView.patchNeutral(message.page,proof.canvas,region,tile,block.id);}finally{region.width=region.height=0;}
+          const regionSource:any=tile.image??tileCanvas(tile);let canvas:HTMLCanvasElement;try{canvas=continuousView.patchNeutral(message.page,proof.canvas,regionSource,tile,block.id);}finally{if(tile.image)tile.image.close();else (regionSource as HTMLCanvasElement).width=0;}
           neutralPages.set(message.page,canvas);neutralIds.add(block.id);
           retainedNavigation=nextNavigation;
           retainedExperiment=true;
@@ -1058,29 +1671,49 @@ api.on(async message=>{
           localCanvas=canvas;localPatch=undefined;liveFlow=undefined;livePages=undefined;displayedSequence=input.sequence;
           canvas.dataset.localPipeline=JSON.stringify({compiler:message.timing,receiveMs:receivedAt-inputAt,loadAndInkMs:checkedAt-receivedAt,tileMs:tiledAt-checkedAt,canvasMs:performance.now()-tiledAt});
           if(model.followPreview&&Number.isFinite(block.caretY))continuousView.revealPosition(message.page,block.caretY);
-          const latency=Math.ceil(performance.now()-inputAt);canvas.dataset.localLatencyMs=String(latency);canvas.dataset.localLatencyEditId=message.editId;localStatus=`Lecture blocks updated in ${latency} ms from edit. Full verification pending.`;refreshPreviewStatus();void api.call('localWarm',message.root,message.baseId,message.editId,latency,'neutral-blocks').catch(()=>{});return;
+          const latency=Math.ceil(performance.now()-inputAt);canvas.dataset.localLatencyMs=String(latency);canvas.dataset.localLatencyEditId=message.editId;localStatus=`Lecture blocks updated in ${latency} ms from edit.`;refreshPreviewStatus();void api.call('localWarm',message.root,message.baseId,message.editId,latency,'neutral-blocks').catch(()=>{});return;
         }
         let canvas=localCanvas;
+        const base=current?.page===message.page&&current.canvas.width===tile.fullWidth&&current.canvas.height===tile.fullHeight?current.canvas:proof.canvas;
         if(!canvas||canvas.dataset.localProofKey!==key||canvas.width!==tile.fullWidth||canvas.height!==tile.fullHeight){
           canvas=document.createElement('canvas');canvas.width=tile.fullWidth;canvas.height=tile.fullHeight;canvas.style.width=tile.originalWidth*scale+'px';canvas.style.height=tile.originalHeight*scale+'px';
-          const base=current?.page===message.page&&current.canvas.width===tile.fullWidth&&current.canvas.height===tile.fullHeight?current.canvas:proof.canvas;
-          canvas.getContext('2d')!.drawImage(base,0,0);if(localCanvas)localCanvas.width=localCanvas.height=0;localCanvas=canvas;
+          if(localCanvas&&localCanvas!==canvas)localCanvas.width=localCanvas.height=0;localCanvas=canvas;
         }
-        const region=tileCanvas(tile);canvas.getContext('2d')!.drawImage(region,tile.sourceX,tile.sourceY,tile.patchWidth,tile.patchHeight,tile.x,tile.y,tile.patchWidth,tile.patchHeight);region.width=region.height=0;
+        canvas.getContext('2d')!.drawImage(base,0,0);
+        drawTile(canvas.getContext('2d')!,tile);
         localPatch={x:tile.x,y:tile.y,width:tile.patchWidth,height:tile.patchHeight,page:message.page};
         displayedSequence=input.sequence;
         canvas.dataset.renderScope='local';canvas.dataset.localLayout='paragraph';canvas.dataset.localProofKey=key;canvas.dataset.localSourceHash=message.sourceHash;canvas.dataset.localEditId=message.editId;canvas.dataset.sourceHash=current?.canvas.dataset.sourceHash??'';canvas.dataset.localRasterMs=String(tile.rasterMs);
         canvas.dataset.localRecovered=String(!!message.recovery||!!message.recoveredBasis);
         canvas.dataset.localPipeline=JSON.stringify({compiler:message.timing,receiveMs:receivedAt-inputAt,loadAndInkMs:checkedAt-receivedAt,tileMs:tiledAt-checkedAt,canvasMs:performance.now()-tiledAt});
-        if(canvas.parentElement!==el('pages'))el('pages').replaceChildren(canvas);el('empty').hidden=true;pageNumber=message.page;el('pageLabel').textContent=`${pageNumber} / ${current?.pdf.numPages??'?'}`;
-        const finish=()=>{if(token!==localRenderToken||localCanvas!==canvas||canvas.dataset.localEditId!==message.editId)return;void api.call('localWarm',message.root,message.baseId,message.editId,Math.ceil(performance.now()-inputAt),canvas.dataset.localLayout).catch(()=>{});const latency=Math.ceil(performance.now()-inputAt);input.displayedLatencyMs??=latency;canvas.dataset.localLatencyMs=String(latency);canvas.dataset.localLatencyEditId=message.editId;canvas.dataset.timingEndpoint=message.visible?'paint opportunity':'canvas (window hidden)';localStatus=`Local paragraph updated in ${latency} ms from edit. Full document verification pending.`+(!message.visible?' Window hidden; measured to canvas.':'');refreshPreviewStatus();};
+        if(model.continuousPreview){
+          await continuousSetup;
+          if(continuousView.id!==message.baseId||!continuousView.matchesScale(scale)){
+            const held=proof.retain(),baseline=await held.document;
+            releaseContinuousLease();continuousLease={id:message.baseId,task:{destroy:async()=>held.release()}};
+            const copy=document.createElement('canvas');copy.width=proof.canvas.width;copy.height=proof.canvas.height;copy.style.width=proof.canvas.style.width;copy.style.height=proof.canvas.style.height;copy.getContext('2d')!.drawImage(proof.canvas,0,0);
+            continuousBasis=continuousBases.get(message.baseId);
+            continuousSetup=continuousView.show(message.baseId,baseline,copy,message.page,scale,window.devicePixelRatio||1);await continuousSetup;
+          }
+          canvas.dataset.pdfPageWidth=String(tile.originalWidth);
+          canvas.dataset.pdfPageHeight=String(tile.originalHeight);
+          continuousView.patchPages(message.page,[canvas]);
+          if(model.followPreview&&Number.isFinite(tile.y)){
+            continuousView.reveal(canvas,(tile.y/scale)+((tile.patchHeight||0)/(scale*2)));
+          }
+        }else{
+          if(canvas.parentElement!==el('pages'))el('pages').replaceChildren(canvas);
+          el('empty').hidden=true;pageNumber=message.page;el('pageLabel').textContent=`${pageNumber} / ${current?.pdf.numPages??'?'}`;
+        }
+        const finish=()=>{if(token!==localRenderToken||localCanvas!==canvas||canvas.dataset.localEditId!==message.editId)return;void api.call('localWarm',message.root,message.baseId,message.editId,Math.ceil(performance.now()-inputAt),canvas.dataset.localLayout).catch(()=>{});const latency=Math.ceil(performance.now()-inputAt);input.displayedLatencyMs??=latency;canvas.dataset.localLatencyMs=String(latency);canvas.dataset.localLatencyEditId=message.editId;canvas.dataset.timingEndpoint=message.visible?'paint opportunity':'canvas (window hidden)';localStatus=`Live paragraph updated in ${latency} ms from edit.`+(!message.visible?' Window hidden; measured to canvas.':'');refreshPreviewStatus();};
         if(message.visible)requestAnimationFrame(()=>requestAnimationFrame(finish));else finish();
       }else tile.image?.close();
     }catch(error){console.debug('Local page output rejected',String(error));ok=false;}finally{flowImage?.close();if(!keepTask)await task?.destroy();if(ok&&localCanvas?.dataset.localEditId===message.editId&&message.editId===latestEdit?.id)renderRecoveryNotice();await api.call('localAck',message.token,ok);}
     return;
   }
   if(message.type==='backupStatus'){el('backupStatus').textContent=message.text;el('backupWarning').hidden=true;el('backupWarning').querySelector('span')!.textContent=message.text;backupIssue=message.error?message.text:undefined;renderRecoveryNotice();return;}
-  if(message.type==='menuAction'){const {action,value}=message;if(action==='copyPerformanceReport'){void command(()=>api.call('copyPerformanceReport'));return;}if(action==='browseBackups'){void command(showBackups);return;}if(action==='backupNow'){void command(backupNow);return;}if(action==='automaticBackups'){void command(async()=>{model.backups=await api.call('automaticBackups',model.backups===false);el<HTMLInputElement>('automaticBackups').checked=model.backups;});return;}if(action==='pasteImage'){void command(()=>pasteImage());return;}if(['zoom','panelLayout','layoutMode','previewMode'].includes(action)){const select=el<HTMLSelectElement>(action);if(select.value===value)return;select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));}else if(action.startsWith('math-'))document.querySelector<HTMLButtonElement>(`[data-math="${action.slice(5)}"]`)?.click();else document.getElementById(action)?.click();return;}
+  if(message.type==='systemTheme'){systemIsDark=!!message.shouldUseDarkColors;applyTheme();return;}
+  if(message.type==='menuAction'){const {action,value}=message;if(action==='closeTab'){closeTab();return;}if(action==='openFolder'){void command(openFolder);return;}if(action==='copyPerformanceReport'){void command(()=>api.call('copyPerformanceReport'));return;}if(action==='browseBackups'){void command(showBackups);return;}if(action==='backupNow'){void command(backupNow);return;}if(action==='automaticBackups'){void command(async()=>{model.backups=await api.call('automaticBackups',model.backups===false);el<HTMLInputElement>('automaticBackups').checked=model.backups;});return;}if(action==='pasteImage'){void command(()=>pasteImage());return;}if(action==='theme'){void command(async()=>{model.theme=await api.call('theme',value);applyTheme(model.theme);});return;}if(action==='togglePdfInvert'){void command(async()=>{model.pdfInvert=await api.call('togglePdfInvert');applyTheme(undefined,model.pdfInvert);});return;}if(action==='zoomIn'){stepZoom(1);return;}if(action==='zoomOut'){stepZoom(-1);return;}if(action==='zoomReset'){setZoom(1);return;}if(['zoom','panelLayout','layoutMode','previewMode'].includes(action)){const select=el<HTMLSelectElement>(action);if(select.value===value)return;select.value=value;select.dispatchEvent(new Event('change',{bubbles:true}));}else if(action.startsWith('math-')){const mathType=action.slice(5);if(view&&!model.previewEditing){insertMathSnippet(view,mathType);return;}document.querySelector<HTMLButtonElement>(`[data-math="${mathType}"]`)?.click();}else document.getElementById(action)?.click();return;}
   if(message.type==='cacheCleanup')el('cacheStatus').textContent=message.text;
   if(message.type==='root'){model.root=message.root;renderTabs();}
   if(message.type==='saved'){
@@ -1216,4 +1849,18 @@ api.on(async message=>{
     await api.call('close');
   });
 });
-model=await api.call('initialize');zoomChoice=model.zoom==='fit-width'?'fit-width':[.8,1,1.25,1.5,2].includes(model.zoom)?model.zoom:1;el<HTMLSelectElement>('zoom').value=String(zoomChoice);if(typeof zoomChoice==='number')scale=zoomChoice;zoomLabel();panelLayout.restore(model.panelLayout);renderEditor();scheduleFit(true);renderToolchain(model.toolchain,true);if(model.showToolchainSetup)el('settings').click();
+model=await api.call('initialize');
+applyTheme(model.theme||'auto',!!model.pdfInvert);
+projectSidebar.update(model);
+void refreshBibEntries();
+const isMacPlatform=(api.platform??(navigator.userAgent.includes('Mac')?'darwin':''))==='darwin';
+if(isMacPlatform){
+  document.body.classList.add('darwin');
+  document.querySelectorAll('[title]').forEach(elem=>{
+    const title=elem.getAttribute('title');
+    if(title&&title.includes('Ctrl'))elem.setAttribute('title',title.replace(/Ctrl\+/g,'⌘').replace(/Ctrl /g,'⌘'));
+  });
+  const buildKbd=el('build')?.querySelector('kbd');
+  if(buildKbd)buildKbd.textContent='⌘B';
+}
+zoomChoice=model.zoom==='fit-width'?'fit-width':[.8,1,1.25,1.5,2].includes(model.zoom)?model.zoom:1;el<HTMLSelectElement>('zoom').value=String(zoomChoice);if(typeof zoomChoice==='number')scale=zoomChoice;zoomLabel();panelLayout.restore(model.panelLayout);renderEditor();scheduleFit(true);renderToolchain(model.toolchain,true);if(model.showToolchainSetup)el('settings').click();

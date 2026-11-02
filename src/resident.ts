@@ -85,7 +85,7 @@ export class ResidentCompiler{
     for(const offset of [from,to])if((source[offset-1]==='\r'&&source[offset]==='\n')||(/[\uD800-\uDBFF]/.test(source[offset-1]??'')&&/[\uDC00-\uDFFF]/.test(source[offset]??'')))throw new Error('Local region boundary splits a source character.');
     // Normalize exactly as splitResidentArticle does, then use engine byte offsets.
     const prefix=source.slice(0,from).replace(/\r\n/g,'\n'),region=source.slice(from,to).replace(/\r\n/g,'\n');
-    if(!/\n[\t ]*\n$/.test(region))throw new Error('Local prototype requires a complete paragraph ending in a blank line.');
+    if(!/\n[\t ]*(\n|$)/.test(region))throw new Error('Local prototype requires a complete paragraph ending in a newline.');
     return {action,start:Buffer.byteLength(prefix),end:Buffer.byteLength(prefix+region)};
   }
   private async execute(source:string,signal:AbortSignal,timeoutMs:number,log:(s:string)=>void,project:ResidentContext={},region?:RegionRequest):Promise<Buffer|undefined>{

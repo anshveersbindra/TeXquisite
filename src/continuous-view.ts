@@ -27,7 +27,7 @@ export class ContinuousView{
   clear(){this.epoch++;this.id='';this.observer?.disconnect();this.dispose(this.entries);this.entries.clear();}
   retainedProjection=(page:number,y:number,id?:string)=>{const e=this.entries.get(page);if(!e)return;const factor=this.scale*this.ratio;return e.retained?((value)=>value===undefined?undefined:value/factor)(e.retained.layout.forward(y*factor,id)):id===undefined?y:undefined;};
   canvasPoint(page:number,canvas:HTMLCanvasElement,x:number,y:number){const e=this.entries.get(page);if(!e||!this.ownsCanvas(page,canvas))return;const rect=e.element.getBoundingClientRect();return {x:(x-rect.left)/this.scale,y:(y-rect.top)/this.scale};}
-  matchesScale(scale:number,ratio:number){return Math.abs(this.scale-scale)<1e-7&&Math.abs(this.ratio-ratio)<1e-7;}
+  matchesScale(scale:number,ratio?:number){return Math.abs(this.scale-scale)<1e-4&&(ratio===undefined||Math.abs(this.ratio-ratio)<1e-4);}
   // Keep the latest live pixels attached while a new raster/proof is prepared.
   // The product scale*ratio still describes their original bitmap resolution.
   rescale(scale:number){
@@ -195,7 +195,7 @@ export class ContinuousView{
     if(oldBlock&&oldBlock!==block)oldBlock.width=oldBlock.height=0;if(oldCanvas)oldCanvas.width=oldCanvas.height=0;
     return block;
   }
-  patchNeutral(page:number,base:HTMLCanvasElement,region:HTMLCanvasElement,tile:any,id:string){
+  patchNeutral(page:number,base:HTMLCanvasElement,region:CanvasImageSource & {width:number;height:number},tile:any,id:string){
     const e=this.entries.get(page);if(!e||e.retained||e.block||e.band||e.coveredBy!==undefined||tile.fullWidth!==base.width||tile.fullHeight!==base.height)throw Error('Neutral page baseline changed.');
     const rect={x:tile.x,y:tile.y,width:tile.patchWidth,height:tile.patchHeight};
     if(![...Object.values(rect),tile.sourceX,tile.sourceY].every(Number.isSafeInteger)||rect.x<0||rect.y<0||rect.width<=0||rect.height<=0||rect.x+rect.width>base.width||rect.y+rect.height>base.height||tile.sourceX<0||tile.sourceY<0||tile.sourceX+rect.width>region.width||tile.sourceY+rect.height>region.height)throw Error('Invalid neutral tile geometry.');

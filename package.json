@@ -16,7 +16,9 @@
     "test:close": "node scripts/close-test.cjs",
     "test:conflict": "node scripts/conflict-test.cjs",
     "test:reliability": "npm run build && node scripts/reliability-test.cjs",
-    "package": "npm run build && electron-builder --win portable --publish never && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/archive-builds.ps1"
+    "package": "npm run build && electron-builder --win portable --publish never && powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/archive-builds.ps1",
+    "package:mac": "npm run build && electron-builder --mac dir --publish never",
+    "package:mac:dist": "npm run build && electron-builder --mac dmg zip --publish never"
   },
   "dependencies": {
     "pdf-lib": "1.17.1"
@@ -52,6 +54,15 @@
       "LICENSE",
       "THIRD-PARTY-NOTICES.txt"
     ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "icon": "media/texquisite.icns",
+      "target": [
+        "dir",
+        "dmg",
+        "zip"
+      ]
+    },
     "win": {
       "target": "portable",
       "signAndEditExecutable": false,

@@ -9,7 +9,7 @@ import {themeIconPath,followIconTheme} from './theme-icon';
 import {ArtifactStore,BuildController,Bundle,hash} from './core';
 import {saveDocument,sourceBytes,SourceConflictError} from './saving';
 import {BuildDiagnostic} from './diagnostics';
-import {projectFolders,listProjectFiles,projectPath} from './project-navigation';
+import {projectFolders,listProjectFiles,projectPath,within,editableProjectFile} from './project-navigation';
 import {ProjectSearch,SearchResult,searchHash,replacementPlan} from './project-search';
 import {Navigation,textHash} from './navigation';
 import type {PreviewFocus} from './navigation-query';
@@ -29,7 +29,7 @@ import {probe} from './toolchain';
 import {standaloneTex,previewRootForDocument} from './document-root';
 
 interface Doc {path:string;text:string;diskHash:string;dirty:boolean;eol:string;}
-interface State {previewMode?:'lecture'|'document';documentRoots?:Record<string,string>;texBin?:string;toolchainSeen?:boolean;projectSidebar?:boolean;docs:Doc[];active:string;root:string;engine:string;latexmk:string;onSave:boolean;backups?:boolean;liveVersion?:number;supportFolders?:string[];zoom?:number|'fit-width';statusBar?:boolean;panelLayout?:PanelPreferences;autoClose?:boolean;followPreview?:boolean;previewEditing?:boolean;continuousPreview?:boolean;lastCursor?:{file:string;at:number};}
+interface State {theme?:'auto'|'dark'|'midnight'|'nord'|'light'|'warm';pdfInvert?:boolean;projectFolder?:string;previewMode?:'lecture'|'document';documentRoots?:Record<string,string>;texBin?:string;toolchainSeen?:boolean;projectSidebar?:boolean;docs:Doc[];active:string;root:string;engine:string;latexmk:string;onSave:boolean;backups?:boolean;liveVersion?:number;supportFolders?:string[];zoom?:number|'fit-width';statusBar?:boolean;panelLayout?:PanelPreferences;autoClose?:boolean;followPreview?:boolean;previewEditing?:boolean;continuousPreview?:boolean;lastCursor?:{file:string;at:number};}
 const testData=process.env.PERSISTENT_TEX_TEST_DATA;
 // Retain the established profile location across the TeXquisite rename.
 app.setPath('userData',testData?path.resolve(testData):path.join(app.getPath('appData'),'Persistent TeX'));
@@ -37,7 +37,7 @@ app.setName('TeXquisite');
 if(!app.requestSingleInstanceLock())app.exit(0);
 app.on('second-instance',()=>{if(window&&!window.isDestroyed()){if(window.isMinimized())window.restore();window.show();window.focus();}});
 protocol.registerSchemesAsPrivileged([{scheme:'texapp',privileges:{standard:true,secure:true,supportFetchAPI:true,stream:true}}]);
-let window:BrowserWindow, state:State={docs:[],active:'',root:'',engine:'pdflatex',latexmk:'latexmk',onSave:true,liveVersion:2};
+let window:BrowserWindow, state:State={docs:[],active:'',root:'',engine:'pdflatex',latexmk:'latexmk',onSave:true,liveVersion:2,continuousPreview:true};
 let controller:BuildController|undefined, displayed:Bundle|undefined, status='Open a LaTeX document to begin.';
 let persistChain=Promise.resolve(), closing=false, rootGeneration=0;
 let closeTimer:ReturnType<typeof setTimeout>|undefined,closeInFlight=false;
@@ -98,14 +98,15 @@ let fullVerification:NodeJS.Timeout|undefined;
 function scheduleFullVerification(editId:string,delay=2500,required=delay===0){
   clearTimeout(fullVerification);
   fullVerification=undefined;
-  // Retain the interactive compiler in lecture mode. Unsupported edits still
-  // need a full build; preserve that distinction when retrying a busy worker.
-  if(state.previewMode==='lecture'&&!required)return;
+  if(!required)return;
   fullVerification=setTimeout(()=>{
     fullVerification=undefined;if(!state.onSave||editId!==latestEditId||state.previewMode==='lecture'&&!required)return;
     // Automatic verification must not compete with a queued/unfinished local
     // frame. Explicit builds bypass this idle scheduler.
-    if(!(required&&controller?.independentLocalOwner)&&(localPreview.busy||!localPreview.prepareFullVerification())){scheduleFullVerification(editId,50,required);return;}
+    if(!controller?.independentLocalOwner){
+      if(!required)return;
+      if(localPreview.busy||!localPreview.prepareFullVerification()){scheduleFullVerification(editId,50,required);return;}
+    }
     void build(undefined,true).catch(e=>setStatus(String(e)));
   },delay);fullVerification.unref();
 }
@@ -331,7 +332,7 @@ async function build(sourceText?:string,automatic=sourceText!==undefined) {
   const focus=lines?{line:lines.length,column:lines.at(-1)!.length}:undefined;
   await controller.request({focus,root:state.root,engine:state.engine,executable:state.latexmk,timeoutMs:120000,sourceText:text,characterMapping:!!(state.previewEditing||state.continuousPreview||state.followPreview),sourceFiles:Object.fromEntries(state.docs.filter(doc=>doc.path!==state.root).map(doc=>[doc.path,doc.text])),supportFolders:state.supportFolders,editId:latestEditId,automatic});
 }
-function updateAppMenu(){Menu.setApplicationMenu(appMenu(state,(action,value)=>send({type:'menuAction',action,value})));if(window&&!window.isDestroyed()){window.setAutoHideMenuBar(false);window.setMenuBarVisibility(true);}}
+function updateAppMenu(){Menu.setApplicationMenu(appMenu(state,(action,value)=>send({type:'menuAction',action,value})));if(window&&!window.isDestroyed()&&process.platform!=='darwin'){window.setAutoHideMenuBar(false);window.setMenuBarVisibility(true);}}
 async function handle(method:string,args:unknown[]) {
   switch(method){
     case 'performanceReport':
@@ -367,8 +368,11 @@ async function handle(method:string,args:unknown[]) {
     }
     case 'previewEditing': clearTimeout(fullVerification);localPreview.stop();state.previewEditing=!!args[0];await persist();if(controller)void build(undefined,true).catch(e=>setStatus(String(e)));return state.previewEditing;
     case 'continuous': clearTimeout(fullVerification);state.continuousPreview=!!args[0];if(state.continuousPreview)state.previewEditing=false;localPreview.setContinuous(state.continuousPreview);await persist();if(controller)void build(undefined,true).catch(e=>setStatus(String(e)));return state.continuousPreview;
+    case 'theme': {const choice=args[0] as 'auto'|'dark'|'midnight'|'nord'|'light'|'warm';if(!['auto','dark','midnight','nord','light','warm'].includes(choice))throw new Error('Invalid theme.');state.theme=choice;await persist();updateAppMenu();return state.theme;}
+    case 'pdfInvert': state.pdfInvert=!!args[0];await persist();updateAppMenu();return state.pdfInvert;
+    case 'togglePdfInvert': state.pdfInvert=state.pdfInvert===false;await persist();updateAppMenu();return state.pdfInvert;
     case 'statusBar': state.statusBar=!!args[0];await persist();return state.statusBar;
-    case 'zoom': {const value=args[0];if(value!=='fit-width'&&![.8,1,1.25,1.5,2].includes(value as number))throw new Error('Invalid zoom.');state.zoom=value as State['zoom'];await persist();return state.zoom;}
+    case 'zoom': {const value=args[0];if(value!=='fit-width'&&(typeof value!=='number'||Number.isNaN(value)||value<0.2||value>5.0))throw new Error('Invalid zoom.');state.zoom=value as State['zoom'];await persist();return state.zoom;}
     case 'panels': state.panelLayout=panelPreferences(args[0]);await persist();return state.panelLayout;
     case 'autoClose': state.autoClose=!!args[0];await persist();return state.autoClose;
     case 'follow': state.followPreview=!!args[0];await persist();if(state.followPreview&&state.onSave&&!state.continuousPreview&&!state.previewEditing&&controller)void build(undefined,true).catch(e=>setStatus(String(e)));return state.followPreview;
@@ -381,7 +385,8 @@ async function handle(method:string,args:unknown[]) {
       const v=values as any;let row;
       if(direction==='forward'&&typeof v?.file==='string'&&Number.isInteger(v.line)&&v.line>0&&Number.isInteger(v.page)){
         const doc=state.docs.find(doc=>doc.path===v.file);if(!doc||textHash(doc.text)!==nav.sources[v.file])return;
-        row=await nativeForward(store.pdf(bundle),nav,v.file,v.line,v.page);
+        const col=typeof v.column==='number'&&Number.isSafeInteger(v.column)?v.column:0;
+        row=await nativeForward(store.pdf(bundle),nav,v.file,v.line,v.page,col,doc.text);
       }else if(direction==='backward'&&[v?.page,v?.x,v?.y].every(n=>typeof n==='number'&&Number.isFinite(n))&&Number.isInteger(v.page)&&v.page>0)row=await nativeBackward(store.pdf(bundle),nav,v.page,v.x,v.y);
       if(displayed?.id!==id)throw Error('The preview changed; select the location again.');return row;
       }finally{release();}
@@ -412,12 +417,23 @@ async function handle(method:string,args:unknown[]) {
     }
     case 'initialize': {
       void runBackup();
+      if(state.continuousPreview===undefined)state.continuousPreview=true;
+      if(!state.previewMode)state.previewMode='lecture';
       localPreview.setContinuous(!!state.continuousPreview);
       localPreview.setLecture(state.previewMode==='lecture');
       const savedRoot=activePreviewRoot();state.root='';
       if(state.lastCursor&&state.docs.some(doc=>doc.path===state.lastCursor!.file)&&Number.isSafeInteger(state.lastCursor.at)&&state.lastCursor.at>=0)localPreview.move(state.lastCursor.file,state.lastCursor.at);
       if(savedRoot)void selectRoot(savedRoot).catch(e=>setStatus(String(e)));
-      return {...state,root:savedRoot,toolchain,showToolchainSetup:(!state.toolchainSeen&&!state.docs.length)||!!toolchain&&(!toolchain.ready||!toolchain.fast.available)&&acknowledgedToolchain!==toolchainSignature(toolchain)};
+      return {
+        ...state,
+        continuousPreview:state.continuousPreview!==false,
+        theme:state.theme??'auto',
+        pdfInvert:!!state.pdfInvert,
+        root:savedRoot,
+        projectFolder:state.projectFolder,
+        toolchain,
+        showToolchainSetup:(!state.toolchainSeen&&(!toolchain||!toolchain.ready))||(!!toolchain&&!toolchain.ready&&acknowledgedToolchain!==toolchainSignature(toolchain))
+      };
     }
     case 'toolchainCheck': return checkToolchain(typeof args[0]==='string'?args[0]:undefined,typeof args[1]==='string'?args[1]:state.engine,typeof args[2]==='string'?args[2]:state.latexmk);
     case 'toolchainPrepare': {
@@ -433,12 +449,12 @@ async function handle(method:string,args:unknown[]) {
     }
     case 'toolchainBrowse': {const choice=await dialog.showOpenDialog(window,{title:'Choose a TeX installation or its executable folder',properties:['openDirectory']});return choice.canceled?null:checkToolchain(choice.filePaths[0],typeof args[0]==='string'?args[0]:state.engine,typeof args[1]==='string'?args[1]:state.latexmk);}
     case 'projectSidebar': state.projectSidebar=!!args[0];await persist();return state.projectSidebar;
-    case 'projectFolders': return {root:state.root,folders:projectFolders(state.root,state.supportFolders)};
-    case 'projectFiles': return listProjectFiles(String(args[0]),projectFolders(state.root,state.supportFolders),String(args[1]??''));
+    case 'projectFolders': return {root:state.root,projectFolder:state.projectFolder,folders:projectFolders(state.root,state.supportFolders,state.projectFolder)};
+    case 'projectFiles': return listProjectFiles(String(args[0]),projectFolders(state.root,state.supportFolders,state.projectFolder),String(args[1]??''));
     case 'projectSearch': {
-      await sourceWrites.catch(()=>{});const generation=rootGeneration,value=args[0] as {query?:unknown;replacement?:unknown;support?:unknown;regex?:unknown;caseSensitive?:unknown}|undefined;if(!state.root)throw Error('Open a root document first.');
+      await sourceWrites.catch(()=>{});const generation=rootGeneration,value=args[0] as {query?:unknown;replacement?:unknown;support?:unknown;regex?:unknown;caseSensitive?:unknown}|undefined;if(!state.root&&!state.projectFolder)throw Error('Open a project folder or document first.');
       if(!value||typeof value.query!=='string'||typeof value.replacement!=='string')throw Error('Enter a search and replacement.');
-      searchPreview=undefined;const folders=projectFolders(state.root,value.support?state.supportFolders:[]),result=await projectSearch.run(folders,state.docs,{query:value.query,replacement:value.replacement,regex:!!value.regex,caseSensitive:!!value.caseSensitive});
+      searchPreview=undefined;const folders=projectFolders(state.root,value.support?state.supportFolders:[],state.projectFolder),result=await projectSearch.run(folders,state.docs,{query:value.query,replacement:value.replacement,regex:!!value.regex,caseSensitive:!!value.caseSensitive});
       if(generation!==rootGeneration)throw Error('The project changed. Search again.');const id=randomUUID();searchPreview={id,generation,folders,result};return {id,folders,matches:result.matches,scanned:result.scanned,skipped:result.skipped,limited:result.limited};
     }
     case 'searchLocation': {
@@ -462,9 +478,148 @@ async function handle(method:string,args:unknown[]) {
       return {state,changes,editId};
     });
     case 'finishProjectReplace': if(args[0]===latestEditId&&state.onSave)void saveAllAndBuild(true).catch(e=>setStatus(String(e)));return true;
-    case 'projectOpen': {const generation=rootGeneration,file=await projectPath(String(args[0]),projectFolders(state.root,state.supportFolders));if(generation!==rootGeneration)throw Error('The project changed while opening this file.');return openFile(file,true,generation);}
+    case 'projectOpen': {const generation=rootGeneration,file=await projectPath(String(args[0]),projectFolders(state.root,state.supportFolders,state.projectFolder));if(generation!==rootGeneration)throw Error('The project changed while opening this file.');return openFile(file,true,generation);}
+    case 'openFolder': {
+      const choice=await dialog.showOpenDialog(window,{properties:['openDirectory'],title:'Open Project Folder'});
+      if(choice.canceled||!choice.filePaths.length)return state;
+      const folder=path.resolve(choice.filePaths[0]);
+      state.projectFolder=folder;
+      state.projectSidebar=true;
+      const currentInFolder=state.root&&within(folder,state.root);
+      if(!currentInFolder){
+        const entries=await fs.readdir(folder,{withFileTypes:true}).catch(()=>[]);
+        const texFiles=entries.filter(e=>e.isFile()&&/\.tex$/i.test(e.name)).map(e=>e.name);
+        const candidate=texFiles.find(f=>/^(main|document|paper|article|index)\.tex$/i.test(f))??texFiles[0];
+        if(candidate){
+          await openFile(path.join(folder,candidate));
+        }
+      }
+      await persist();
+      return state;
+    }
+    case 'createFile': {
+      const folder=String(args[0]),name=String(args[1]).trim();
+      if(!name||name.includes('/')||name.includes('\\'))throw new Error('Enter a valid file name.');
+      const fullPath=path.join(folder,name);
+      if(await fs.stat(fullPath).catch(()=>null))throw new Error('A file with this name already exists.');
+      let content = '';
+      if (/\.tex$/i.test(name)) {
+        const baseName = path.basename(name, path.extname(name)) || 'Document';
+        content = `\\documentclass[12pt]{article}\n\\usepackage[utf8]{inputenc}\n\\usepackage{geometry}\n\\usepackage{amsmath, amssymb}\n\\geometry{a4paper, margin=1in}\n\n\\title{${baseName}}\n\\author{Your Name}\n\\date{\\today}\n\n\\begin{document}\n\n\\maketitle\n\n\\section{Introduction}\n\n\\end{document}\n`;
+      }
+      await fs.writeFile(fullPath,content,'utf8');
+      if(editableProjectFile(name)){
+        return openFile(fullPath);
+      }
+      return {path:fullPath,name,state};
+    }
+    case 'createFolder': {
+      const parent=String(args[0]),name=String(args[1]).trim();
+      if(!name||name.includes('/')||name.includes('\\'))throw new Error('Enter a valid folder name.');
+      const fullPath=path.join(parent,name);
+      if(await fs.stat(fullPath).catch(()=>null))throw new Error('A folder with this name already exists.');
+      await fs.mkdir(fullPath,{recursive:true});
+      return {path:fullPath,name};
+    }
+    case 'renameEntry': {
+      const oldPath=String(args[0]),newName=String(args[1]).trim();
+      if(!newName||newName.includes('/')||newName.includes('\\'))throw new Error('Enter a valid name.');
+      const newPath=path.join(path.dirname(oldPath),newName);
+      if(oldPath===newPath)return {oldPath,newPath};
+      if(await fs.stat(newPath).catch(()=>null))throw new Error('An entry with this name already exists.');
+      await fs.rename(oldPath,newPath);
+      for(const doc of state.docs){
+        if(doc.path===oldPath){doc.path=newPath;}
+        else if(doc.path.startsWith(oldPath+path.sep)){doc.path=newPath+doc.path.slice(oldPath.length);}
+      }
+      if(state.active===oldPath)state.active=newPath;
+      if(state.root===oldPath)state.root=newPath;
+      await persist();
+      return {oldPath,newPath,state};
+    }
+    case 'deleteEntry': {
+      const target=String(args[0]);
+      const stat=await fs.stat(target).catch(()=>null);
+      if(!stat)throw new Error('Item does not exist.');
+      try {
+        const {shell}=require('electron');
+        await shell.trashItem(target);
+      } catch {
+        await fs.rm(target,{recursive:true,force:true});
+      }
+      state.docs=state.docs.filter(d=>d.path!==target&&!d.path.startsWith(target+path.sep));
+      if(state.active===target||state.active.startsWith(target+path.sep)){
+        state.active=state.docs[0]?.path??'';
+      }
+      if(state.root===target||state.root.startsWith(target+path.sep)){
+        state.root=state.docs.find(d=>d.path.endsWith('.tex'))?.path??'';
+      }
+      await persist();
+      return {success:true,target,state};
+    }
+    case 'copyEntry': {
+      const source=String(args[0]),destFolder=String(args[1]);
+      const base=path.basename(source);
+      let dest=path.join(destFolder,base);
+      if(await fs.stat(dest).catch(()=>null)){
+        const ext=path.extname(base),name=path.basename(base,ext);
+        dest=path.join(destFolder,`${name} (copy)${ext}`);
+      }
+      await fs.cp(source,dest,{recursive:true});
+      return {dest};
+    }
+    case 'moveEntry': {
+      const source=String(args[0]),destFolder=String(args[1]);
+      const dest=path.join(destFolder,path.basename(source));
+      if(source===dest)return {dest};
+      if(await fs.stat(dest).catch(()=>null))throw new Error('Destination already has an item with this name.');
+      await fs.rename(source,dest);
+      for(const doc of state.docs){
+        if(doc.path===source)doc.path=dest;
+        else if(doc.path.startsWith(source+path.sep))doc.path=dest+doc.path.slice(source.length);
+      }
+      if(state.active===source)state.active=dest;
+      if(state.root===source)state.root=dest;
+      await persist();
+      return {dest,state};
+    }
+    case 'fetchBibEntries': {
+      const folders=projectFolders(state.root,state.supportFolders,state.projectFolder);
+      const bibFiles=new Set<string>();
+      for(const doc of state.docs){if(/\.bib$/i.test(doc.path))bibFiles.add(doc.path);}
+      for(const folder of folders){
+        try{
+          const entries=await fs.readdir(folder,{withFileTypes:true}).catch(()=>[]);
+          for(const entry of entries){if(entry.isFile()&&/\.bib$/i.test(entry.name))bibFiles.add(path.join(folder,entry.name));}
+        }catch{}
+      }
+      const bibList:Array<{key:string;type:string;title?:string;author?:string;year?:string;file:string}>=[];
+      for(const bibPath of bibFiles){
+        try{
+          const openDoc=state.docs.find(d=>d.path===bibPath);
+          const content=openDoc?openDoc.text:await fs.readFile(bibPath,'utf8');
+          const entryRegex=/@([a-zA-Z]+)\s*[\{\(]\s*([^,\s]+)\s*,([^@]*)/g;
+          let m:RegExpExecArray|null;
+          while((m=entryRegex.exec(content))!==null){
+            const type=m[1].toLowerCase(),key=m[2].trim(),body=m[3]||'';
+            const titleMatch=/title\s*=\s*[\{"']([^"'}]+)[\}"']/i.exec(body);
+            const authorMatch=/author\s*=\s*[\{"']([^"'}]+)[\}"']/i.exec(body);
+            const yearMatch=/year\s*=\s*[\{"']?(\d{4})[\}"']?/i.exec(body);
+            bibList.push({
+              key,
+              type,
+              title:titleMatch?titleMatch[1].trim():undefined,
+              author:authorMatch?authorMatch[1].trim():undefined,
+              year:yearMatch?yearMatch[1].trim():undefined,
+              file:path.basename(bibPath)
+            });
+          }
+        }catch{}
+      }
+      return bibList;
+    }
     case 'open': {
-      const choice=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'TeX source and text',extensions:['tex','sty','cls','bib','txt']}]});
+      const choice=await dialog.showOpenDialog(window,{properties:['openFile'],filters:[{name:'TeX source and text',extensions:['tex','sty','cls','bib','txt','md','json','csv']}]});
       return choice.canceled?state:openFile(choice.filePaths[0]);
     }
     case 'automaticBackups': state.backups=!!args[0];await persist();if(state.backups)void runBackup();return state.backups;
@@ -487,7 +642,9 @@ async function handle(method:string,args:unknown[]) {
     case 'new': {
       const choice=await dialog.showSaveDialog(window,{defaultPath:'untitled.tex',filters:[{name:'LaTeX source',extensions:['tex']}]});
       if(choice.canceled||!choice.filePath)return state;
-      await fs.writeFile(choice.filePath,'\\documentclass{article}\n\\usepackage{amsmath,amssymb}\n\\begin{document}\n\n\\end{document}\n',{flag:'wx'});
+      const baseName = path.basename(choice.filePath, path.extname(choice.filePath)) || 'Untitled';
+      const content = `\\documentclass[12pt]{article}\n\\usepackage[utf8]{inputenc}\n\\usepackage{geometry}\n\\usepackage{amsmath, amssymb}\n\\geometry{a4paper, margin=1in}\n\n\\title{${baseName}}\n\\author{Your Name}\n\\date{\\today}\n\n\\begin{document}\n\n\\maketitle\n\n\\section{Introduction}\n\n\\end{document}\n`;
+      await fs.writeFile(choice.filePath,content,{flag:'wx'});
       return openFile(choice.filePath);
     }
     case 'reload': {
@@ -563,11 +720,12 @@ async function handle(method:string,args:unknown[]) {
       setStatus(state.onSave?'Saving edits and updating preview…':'Automatic saving and preview paused.');
       if(state.onSave){
         const immediate=!!controller;
-        const local=immediate&&!state.previewEditing&&state.engine==='pdflatex'&&state.latexmk==='latexmk'&&typeof editId==='string'&&localPreview.request(doc.path,text,editId);
+        const lmkBase=state.latexmk?path.basename(state.latexmk).toLowerCase().replace(/\.(exe|bat|pl|cmd)$/,''):'latexmk';
+        const local=immediate&&!state.previewEditing&&state.engine==='pdflatex'&&lmkBase==='latexmk'&&typeof editId==='string'&&localPreview.request(doc.path,text,editId);
         tracePreview({event:'edit-route',editId,route:local?(localPreview.ready?'local-ready':'local-warming'):'full',cursor:state.lastCursor?.at,characters:text.length});
         clearTimeout(fullVerification);
         if(local)scheduleFullVerification(editId!);
-        else if(immediate){if(latestEditId)scheduleFullVerification(latestEditId,0);else void build(undefined,true).catch(e=>setStatus(String(e)));}
+        else if(immediate){if(latestEditId)scheduleFullVerification(latestEditId,350,true);else void build(undefined,true).catch(e=>setStatus(String(e)));}
         // Accept the editor revision immediately. Automatic disk saving remains
         // serialized and errors retain the draft, but does not block preview IPC.
         void saveAllAndBuild(false,immediate).catch(async error=>{await persist();setStatus(String(error));});
@@ -593,7 +751,11 @@ async function handle(method:string,args:unknown[]) {
       const value=args[0] as Partial<State>;
       if(!['pdflatex','xelatex','lualatex','latex'].includes(String(value.engine))||typeof value.latexmk!=='string'||!value.latexmk.trim())throw new Error('Invalid toolchain settings.');
       const checked=await checkToolchain(typeof value.texBin==='string'?value.texBin:undefined,value.engine!,value.latexmk);
-      clearTimeout(fullVerification);localPreview.stop();controller?.cancel();state.engine=value.engine!;state.latexmk=value.latexmk;state.texBin=checked.selected??value.texBin;state.toolchainSeen=true;state.onSave=!!value.onSave;activateToolchain(checked);acknowledgedToolchain=toolchainSignature(checked);await fs.mkdir(data(),{recursive:true});await fs.writeFile(path.join(data(),'toolchain-check.json'),JSON.stringify({acknowledged:acknowledgedToolchain}));await persist();/* A changed installation needs fresh capability caches and workers. */if(state.root&&checked.ready)void selectRoot(state.root).catch(e=>setStatus(String(e)));return {...state,toolchain:checked};
+      clearTimeout(fullVerification);localPreview.stop();controller?.cancel();state.engine=value.engine!;state.latexmk=value.latexmk;state.texBin=checked.selected??value.texBin;state.toolchainSeen=true;state.onSave=!!value.onSave;
+      if(value.theme&&['auto','dark','midnight','nord','light','warm'].includes(value.theme))state.theme=value.theme;
+      if(typeof value.pdfInvert==='boolean')state.pdfInvert=value.pdfInvert;
+      updateAppMenu();
+      activateToolchain(checked);acknowledgedToolchain=toolchainSignature(checked);await fs.mkdir(data(),{recursive:true});await fs.writeFile(path.join(data(),'toolchain-check.json'),JSON.stringify({acknowledged:acknowledgedToolchain}));await persist();/* A changed installation needs fresh capability caches and workers. */if(state.root&&checked.ready)void selectRoot(state.root).catch(e=>setStatus(String(e)));return {...state,toolchain:checked};
     }
     case 'ack': {
       const [id,error]=args;const pending=waiting.get(String(id));
@@ -619,6 +781,36 @@ async function handle(method:string,args:unknown[]) {
       if(!previous)throw new Error('No preceding successful preview is available.');
       await prepare(previous,store);displayed=previous;send({type:'commit',id:previous.id,...(previous.recovered?{timing:{recovered:true,backend:'Recovered preview — LaTeX errors need attention.',requestToCommitMs:0}}:{})});setStatus(previous.recovered?'Showing a preceding recovered preview with temporary LaTeX repairs.':'Showing the preceding successful preview.');return true;
     }
+    case 'closeTab': {
+      const target = typeof args[0] === 'string' && args[0] ? args[0] : state.active;
+      if (!target) return state;
+      const index = state.docs.findIndex(d => d.path === target);
+      if (index === -1) return state;
+      const closingDoc = state.docs[index];
+      if (closingDoc.dirty && state.onSave) {
+        try { await writeSource(closingDoc); } catch {}
+      }
+      state.docs.splice(index, 1);
+      if (state.active === target) {
+        const nextDoc = state.docs[index] ?? state.docs[index - 1];
+        state.active = nextDoc ? nextDoc.path : '';
+        if (state.active) {
+          const root = activePreviewRoot();
+          if (root && root !== state.root) await selectRoot(root);
+          rememberDocumentRoot(state.active);
+        } else {
+          state.root = '';
+          clearTimeout(fullVerification);
+          localPreview.stop();
+          controller?.cancel();
+        }
+      } else if (state.root === target) {
+        state.root = state.docs.find(d => d.path.endsWith('.tex'))?.path ?? '';
+        if (state.root) await selectRoot(state.root);
+      }
+      await persist();
+      return state;
+    }
     case 'close': return closeWindow();
     default: throw new Error('Unknown command.');
   }
@@ -639,7 +831,7 @@ async function closeWindow() {
 }
 app.whenReady().then(async()=>{
   try{const saved=JSON.parse(await fs.readFile(path.join(data(),'session.json'),'utf8'));if(Array.isArray(saved.docs))state=saved;}catch{}
-  state.previewMode=state.previewMode==='lecture'?'lecture':'document';
+  state.previewMode=state.previewMode==='document'?'document':'lecture';
   // A clean restored buffer has no unsaved edits to protect. Refresh its disk
   // baseline now, rather than raising a conflict when the user next pastes.
   for(const doc of state.docs){
@@ -651,8 +843,37 @@ app.whenReady().then(async()=>{
       doc.text=text.replace(/\r\n/g,'\n');doc.eol=text.includes('\r\n')?'\r\n':'\n';doc.diskHash=hash(disk);
     }catch{}
   }
-  if(state.liveVersion!==2){state.onSave=true;state.liveVersion=2;}
-  activateToolchain(await checkToolchain());
+  const initialChecked = await checkToolchain();
+  activateToolchain(initialChecked);
+  const selected = initialChecked.selected;
+  if (initialChecked.fast?.preparable && !initialChecked.fast?.available && selected) {
+    void (async () => {
+      try {
+        const env = toolEnvironment(selected, initialEnvironment);
+        const kpse = initialChecked.tools.find(t => t.name === 'kpsewhich')?.path;
+        if (!kpse) return;
+        const root = await probe(kpse, ['-var-value=TEXMFDIST'], env);
+        const files: Record<string, string> = {}, fingerprints: Record<string, string> = {};
+        for (const name of fingerprintFiles) {
+          files[name] = await probe(kpse, [name], env);
+          fingerprints[name] = formatFingerprint(name, await fs.readFile(files[name]), FORMAT_FINGERPRINT_POLICY);
+        }
+        await generateInstalledFormat({
+          keep: toolchain?.fast.resources?.formatManifest ? [toolchain.fast.resources.formatManifest] : [],
+          assets: path.join(app.getAppPath(), 'engine/resident'),
+          cache: path.join(data(), 'formats'),
+          installation: selected,
+          root,
+          files,
+          fingerprints,
+          env
+        });
+        const fresh = await checkToolchain(selected);
+        activateToolchain(fresh);
+        send({ type: 'toolchain', toolchain: fresh });
+      } catch {}
+    })();
+  }
   try{acknowledgedToolchain=JSON.parse(await fs.readFile(path.join(data(),'toolchain-check.json'),'utf8')).acknowledged;}catch{}
   protocol.handle('texapp',request=>{
     const url=new URL(request.url);const relative=decodeURIComponent(url.pathname).replace(/^\//,'');
@@ -661,8 +882,12 @@ app.whenReady().then(async()=>{
     return net.fetch(pathToFileURL(file).toString());
   });
   session.defaultSession.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));
-  window=new BrowserWindow({autoHideMenuBar:false,width:1440,height:940,minWidth:900,minHeight:600,show:!process.env.PERSISTENT_TEX_TEST_HIDDEN,icon:themeIconPath(nativeTheme,path.join(__dirname,'../media')),title:`TeXquisite ${app.getVersion()} — local paragraph preview`,backgroundColor:'#f5f4f0',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false}});
-  followIconTheme(window,nativeTheme,path.join(__dirname,'../media'));
+  const isMac=process.platform==='darwin';
+  const isDark=state.theme==='dark'||((!state.theme||state.theme==='auto')&&nativeTheme.shouldUseDarkColors);
+  window=new BrowserWindow({autoHideMenuBar:!isMac,width:1440,height:940,minWidth:900,minHeight:600,show:!process.env.PERSISTENT_TEX_TEST_HIDDEN,icon:isMac?undefined:themeIconPath(nativeTheme,path.join(__dirname,'../media')),titleBarStyle:isMac?'hiddenInset':'default',trafficLightPosition:isMac?{x:14,y:11}:undefined,title:`TeXquisite ${app.getVersion()} — local paragraph preview`,backgroundColor:isDark?'#121417':'#f5f4f0',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false}});
+  if(isMac&&app.dock){try{const emblem=nativeImage.createFromPath(path.join(app.getAppPath(),'media/texquisite.icns'));if(!emblem.isEmpty())app.dock.setIcon(emblem);}catch{}}
+  if(!isMac)followIconTheme(window,nativeTheme,path.join(__dirname,'../media'));
+  nativeTheme.on('updated',()=>{send({type:'systemTheme',shouldUseDarkColors:nativeTheme.shouldUseDarkColors});});
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   window.webContents.on('will-navigate',event=>event.preventDefault());
   window.on('close',event=>{
@@ -683,9 +908,10 @@ app.whenReady().then(async()=>{
   });
   ipcMain.handle('desktop',async(event,method,...args)=>{
     if(event.sender!==window.webContents||event.senderFrame?.url!=='texapp://local/index.html')throw new Error('Untrusted sender.');
-    try{const result=await handle(method,args);if(['initialize','projectSidebar','automaticBackups','statusBar','zoom','panels','autoClose','follow','previewEditing','continuous','previewMode','live','settings'].includes(method))updateAppMenu();return result;}catch(error){if(!['projectSearch','searchLocation','applyProjectReplace','navigateSource','navigateDiagnostic','nativeNavigation','follow'].includes(method))setStatus(error instanceof Error?error.message:String(error));throw error;}
+    try{const result=await handle(method,args);if(['initialize','projectSidebar','automaticBackups','statusBar','zoom','panels','autoClose','follow','previewEditing','continuous','previewMode','live','settings','theme','pdfInvert','togglePdfInvert'].includes(method))updateAppMenu();return result;}catch(error){if(!['projectSearch','searchLocation','applyProjectReplace','navigateSource','navigateDiagnostic','nativeNavigation','follow'].includes(method))setStatus(error instanceof Error?error.message:String(error));throw error;}
   });
-  updateAppMenu();window.setAutoHideMenuBar(false);window.setMenuBarVisibility(true);
+  updateAppMenu();
+  if(!isMac){window.setAutoHideMenuBar(false);window.setMenuBarVisibility(true);}
   await window.loadURL('texapp://local/index.html');
   const maintain=()=>{if(cleanupIdle()&&(cleanupRequested||Date.now()-lastCleanup>=900000))void cleanupCaches(cleanupRequested).then(result=>{if(!result.deferred){lastCleanup=Date.now();cleanupRequested=false;}const text=`Cache cleanup freed ${(result.freedBytes/1048576).toFixed(1)} MB; active projects and accepted previews retained.`;send({type:'cacheCleanup',text:result.deferred?'Cleanup deferred until typing and builds pause.':text});if(result.removed)appendLog(text+'\n');}).catch(error=>appendLog('Cache cleanup deferred: '+String(error)+'\n'));};
   const cleanupTimer=setInterval(maintain,15000);cleanupTimer.unref();window.once('closed',()=>clearInterval(cleanupTimer));

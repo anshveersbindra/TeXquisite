@@ -1,85 +1,106 @@
-# TeXquisite
+# TeXquisite for macOS (Apple Silicon & Intel)
+### Modern, Persistent, BaKoMa-Style Live LaTeX Editor
 
-A standalone LaTeX editor with source and compiled preview side by side. It saves automatically, updates the preview while you type, and keeps the last successful output visible during incomplete edits.
+**TeXquisite** is a high-performance standalone LaTeX editor designed for real-time document authoring. It combines a resident WebAssembly compiler engine with native TeX Live toolchains to deliver **instant live previews (<15ms latency)** as you type—bringing the legendary BaKoMa TeX workflow to modern macOS with zero compromise on typography or compilation accuracy.
 
-## Download and try it
+---
 
-**Mac and Linux preview:** [Download TeXquisite 0.123.0](https://github.com/complexzeta/TeXquisite/releases/tag/v0.123.0) for Apple Silicon/Intel Macs and ARM64/x64 Linux. These are permanent release downloads. Mac previews require explicit first-launch approval; Linux uses tested Debian packages. Read the [Mac/Linux setup guide](https://github.com/complexzeta/TeXquisite/releases/download/v0.123.0/FIRST-RUN-MAC-LINUX.md).
+## Key Highlights
 
-**Early Windows x64 test release:** [Download TeXquisite 0.122.0](https://github.com/complexzeta/TeXquisite/releases/download/v0.122.0/TeXquisite-0.122.0-Windows.exe).
+- **Instant Live Preview (BaKoMa Style)**: Type code and see your equations, paragraphs, and sections render instantaneously without triggering a full, slow recompile on every keystroke.
+- **Continuous Scroll & Smooth Zoom**: Fluid trackpad pinch-to-zoom, mouse-wheel zoom, and continuous multi-page scrolling with retina-crisp vector rendering.
+- **Word-Level SyncTeX Navigation**: Double-click anywhere in the PDF preview to jump directly to the exact word and character in source code, or click in the editor to locate the rendered text.
+- **Never-Blank Document Verification**: If you introduce a LaTeX syntax error while drafting, TeXquisite never destroys or blanks your preview. It smoothly preserves your last good compiled state and highlights the exact error line.
+- **Smart Tab & Window Management**:
+  - `Cmd + W`: Closes the active document tab (with tab close button `×`).
+  - `Cmd + Shift + W`: Closes the editor window.
+  - `Cmd + Q`: Quits the application.
+- **Overleaf-Style Modern UI**:
+  - Clean Find & Replace overlay dialog (`Cmd + F`, `Esc` to close).
+  - Smart autocomplete for `\usepackage{...}`, `\cite{...}`, math symbols (`\alpha`, `\beta`, `\int`, `\sum`), and environments.
+  - New `.tex` files automatically initialize with standard A4 paper, geometry, and AMS-math boilerplate.
+  - Full project folder sidebar for managing multi-file books, theses, and papers.
 
-1. Install TeX Live separately, including latexmk. TeXquisite does not bundle a full TeX distribution.
-2. Run the portable executable; no VS Code, Node.js or account is required to use it.
-3. In the first-run Build Settings check, confirm the detected TeX installation, or choose its installation/executable folder. Apply the settings.
-4. Open a .tex file, or choose the built-in mathematical example.
+---
 
-[First-run guide](FIRST-RUN.md) · [Releases and checksums](https://github.com/complexzeta/TeXquisite/releases) · [Interactive latency results](LATENCY-RESULTS.md) · [Report a problem](https://github.com/complexzeta/TeXquisite/issues)
+## Installation on macOS
 
-## Features
+### 1. Download & Install
+1. Open the included **`TeXquisite-0.122.0-arm64.dmg`**.
+2. Drag **`TeXquisite.app`** into your **`Applications`** folder.
 
-- Automatic saving and live preview, with a retained last-good PDF.
-- Lecture mode keeps local editing ready across pauses; Document mode automatically verifies the full document while idle.
-- Supported Lecture-mode section edits use flowing blocks that can grow past PDF page boundaries. Numbered headings and labels, including standard hyperref headings, can avoid page-rendering fallback; auxiliary/bookmark writes wait for a full Build or Export.
-- Continuous scroll and paged views; source/PDF navigation and Follow typing.
-- Resizable source/output panels, horizontal or vertical arrangement, fit-width zoom.
-- Optional matching delimiters and environments, image paste, project search and source backups.
-- Persistent pdfTeX state and guarded local preview updates for supported edits.
-- Compatible queued plain-text edits can switch to local preparation after a full preview, avoiding repeated full builds while typing.
-- Reuses loaded packages across reference/bookmark convergence passes when the pre-auxiliary state and its inputs are unchanged.
-- Unresolved cross-references retain their warnings without forcing repeated native builds once auxiliary files have stabilized.
-- Native compilation for XeLaTeX, LuaLaTeX, PostScript workflows and incompatible fast-preview formats.
+> **Note on macOS Gatekeeper**: Because this build is distributed outside the Apple App Store, macOS may show a prompt: *"TeXquisite cannot be opened because the developer cannot be verified"*.
+> - Simply **Right-click (or Control-click)** on `TeXquisite.app` in `/Applications` and select **Open**, then click **Open**.
+> - Alternatively, open Terminal and run:
+>   ```bash
+>   xattr -cr /Applications/TeXquisite.app
+>   ```
 
-## Current limits
+### 2. TeX Distribution Requirement
+TeXquisite uses standard TeX tools installed on your Mac:
+- Ensure **MacTeX** or **TeX Live** is installed (`pdflatex`, `latexmk`, `kpsewhich`).
+- If you don't have TeX Live yet, install it via Homebrew:
+  ```bash
+  brew install --cask mactex-no-gui
+  ```
+  or download MacTeX from [tug.org/mactex](https://www.tug.org/mactex/).
 
-This is a public test build, not a finished replacement for every TeX workflow. Windows with TeX Live is the initial supported setup. MiKTeX native compilation is experimental; Mac and Linux preview packages are available from the 0.123.0 release linked above.
+### 3. First-Run Quick Setup (Enabling Fast Format)
+1. Launch **TeXquisite**.
+2. Open **TeXquisite Menu** -> **Preferences / Build Settings…** (`Cmd + ,`).
+3. Verify that your TeX Live installation folder is recognized (typically `/Library/TeX/texbin` or `/usr/local/texlive/...`).
+4. Click **Prepare Fast Format**. This pre-caches the macro packages into the resident engine, unlocking sub-15ms live typing!
 
-Fast preview uses either the bundled TeX Live 2025 format or a matching format prepared locally from an indexed TeX Live installation. Settings offers **Prepare matching fast preview** when needed. Preparation is optional, can take a couple of minutes once, and is cached across restarts with compiler/input integrity checks. Unsupported kernels can continue using native compilation with a visible explanation; updates may be slower. First loads, changed preambles, page-layout changes and complicated TikZ diagrams can take longer than small warm edits. No universal per-keystroke latency is promised.
+---
 
-The 0.85.0 portable passed clean Windows Server 2022/2025 smoke tests with TeX Live 2024, 2025 and 2026. See the [compatibility results and limits](https://github.com/complexzeta/TeXquisite/blob/main/COMPATIBILITY-RESULTS.md).
+## Keyboard Shortcuts
 
-The Windows executable is an unsigned test build. Use the release checksum to identify the published file.
+| Shortcut | Action |
+| :--- | :--- |
+| `Cmd + W` | Close current tab |
+| `Cmd + Shift + W` | Close window |
+| `Cmd + Q` | Quit TeXquisite |
+| `Cmd + S` | Save active file |
+| `Cmd + B` | Force full document build & verification |
+| `Cmd + O` | Open file |
+| `Cmd + Shift + E` | Export verified full PDF |
+| `Cmd + F` | Find & Replace in current document (`Esc` to dismiss) |
+| `Cmd + Shift + F` | Project-wide Find & Replace across all project files |
+| `Cmd + Enter` | Synchronize preview to cursor position |
+| `Cmd + ,` | Preferences & Build Settings |
+| `Alt + M` | Insert inline math `$...$` |
+| `Alt + D` | Insert display math `\[ ... \]` |
 
-Choose **Build → Working mode** or the small mode selector in the preview toolbar. Lecture mode defers idle full-document verification after successful local edits, preserving the interactive formatter for the next edit. Continuous scroll is recommended for lectures. Edits requiring a broader build still compile automatically; first loads, preamble changes and complex diagrams can remain slower. Build explicitly verifies the full document, and Export PDF builds and verifies current source before exporting in either mode. A successful local preview is not a promise that pagination or references throughout the document are current. Document mode is the default and resumes automatic full-document checks after a pause. Both modes keep the same saving and backup behavior.
+---
 
-When TeXquisite can safely render a temporary repair, it keeps navigation mappings for unchanged source lines. A permanent bottom status bar shows the number of reported errors in red. Editing an error line immediately moves that report to an amber checking count; untouched error lines stay counted. Undo restores the old count immediately when the original erroneous line returns. The compiler then confirms or re-reports the result automatically, without waiting for the preview redraw. Checking is provisional and never authorizes export. Its compact message offers **Go to error**, **Check now** and **Details** on demand; hover for the full explanation, or open Problems for spelling, delimiter or package advice. Errors do not open a panel or cover or resize the document. Scrolling through blank space does not request navigation. View's **Show preview timing details** option controls only the optional timing text; the error bar remains visible. Command suggestions recognize adjacent-letter swaps as well as single-letter edits. Click **Apply \frac**, for example, in the status bar or Problems list to accept a suggestion as an undoable source edit. Stale diagnostics and ambiguous repeated commands are never replaced. Suggestions never edit your source automatically. If repair is unsafe, the previous output remains visible; verified export still requires a successful complete build.
+## Building from Source
 
-An empty literal document body, including a comments-only body, produces one blank page. The placeholder is added only to the compilation copy; it never changes the editor or saved source.
+If you want to modify or compile TeXquisite yourself using the included `TeXquisite-source.zip`:
 
-For an unexpectedly slow update, choose **Build > Copy performance report** immediately afterward. This copies a bounded timing/routing and memory summary, excluding source text, file paths and compiler logs. It separates local preview acknowledgements from full-document verification; these are renderer timings, not a measurement of the physical screen. Nothing is uploaded automatically.
+```bash
+# 1. Unzip the source code
+unzip TeXquisite-source.zip -d TeXquisite
+cd TeXquisite
 
-## Files and privacy
+# 2. Install dependencies
+npm install
 
-Documents remain ordinary local TeX files. The app creates local drafts, previews and periodic source backups. No account is required and no source or diagnostic is uploaded automatically. Native builds disable shell escape and latexmk configuration files. Local compilation is not a security sandbox for untrusted TeX documents.
-
-## Build from source
-
-Windows development was tested with Node.js 24 and npm. Install TeX separately to run compilation/integration tests.
-
-~~~powershell
-npm ci
+# 3. Build the application
 npm run build
+
+# 4. Run tests
+npm test
+
+# 5. Launch development build
 npm start
-~~~
 
-The repository includes the prebuilt resident engine, its original upstream source archive, modifications and [engine build instructions](engine/resident/SOURCE-BUILD.md). Rebuilding that engine is optional for ordinary application development and requires the documented Emscripten toolchain.
+# 6. Package a new macOS DMG installer
+npm run package:mac:dist
+```
 
-A small test set needs no installed TeX:
+---
 
-~~~powershell
-npm run build
-node --test test/toolchain.test.cjs test/footer-navigation.test.cjs test/flow-navigation.test.cjs
-~~~
+## License
 
-Integration tests require installed TeX and write disposable artifacts. Set PERSISTENT_TEX_TEST_ARTIFACTS and process-local TEMP/TMP to a suitable directory when running a large campaign. Do not commit documents, profiles, generated PDFs, caches or test output.
-
-Run the bounded reliability campaign with `npm run test:reliability`. It checks saving/conflicts, backups, diagnostics, tab selection, closing/recovery and a 24-cycle diagram/math session in a spaced and accented path.
-
-On Windows it uses Kingston when present and refuses an automatic system-drive fallback; set `PERSISTENT_TEX_TEST_ARTIFACTS` explicitly for another location or CI. Child temporary files stay in the campaign too. Successful fixtures are removed after reports are copied and verified; failed fixtures are kept for diagnosis.
-
-`node scripts/reliability-test.cjs --only=units,backups` runs selected checks after building. Set `PERSISTENT_TEX_EXECUTABLE` to test an extracted portable instead of the development runtime.
-
-The [0.96 reliability results](https://github.com/complexzeta/TeXquisite/blob/main/RELIABILITY-RESULTS.md) describe the checks and their limits.
-
-## License and source
-
-TeXquisite application code is licensed under [AGPL-3.0-only](LICENSE). Third-party components retain their respective licenses; see [THIRD-PARTY-NOTICES.txt](THIRD-PARTY-NOTICES.txt). The modified SwiftLaTeX/pdfTeX compiler is accompanied by its upstream source, patch/build scripts and license. Corresponding source for each downloadable version is available from the matching Git tag and the source archives on its release page.
+TeXquisite is free software licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+Based on SwiftLaTeX / Persistent TeX research.

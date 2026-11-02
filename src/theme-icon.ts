@@ -7,7 +7,7 @@ export function themeIconPath(theme:Theme,directory:string,platform=process.plat
  const dark=platform==='win32'?theme.shouldUseDarkColorsForSystemIntegratedUI:theme.shouldUseDarkColors;
  return path.join(directory,dark?'texquisite-icon-dark.ico':'texquisite-icon-light.ico');
 }
-export function followIconTheme(window:Pick<BrowserWindow,'setIcon'|'once'|'isDestroyed'>,theme:Theme,directory:string){
- const update=()=>{if(!window.isDestroyed())window.setIcon(themeIconPath(theme,directory));};
+export function followIconTheme(window:Pick<BrowserWindow,'setIcon'|'once'|'isDestroyed'>,theme:Theme,directory:string,platform:NodeJS.Platform='win32'){
+ const update=()=>{if(!window.isDestroyed())window.setIcon(themeIconPath(theme,directory,platform));};
  theme.on('updated',update);window.once('closed',()=>theme.removeListener('updated',update));update();
 }

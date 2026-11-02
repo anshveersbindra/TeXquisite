@@ -1,24 +1,392 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'">
-<title>TeXquisite 0.117.0 — continuous scroll</title><link rel="icon" type="image/svg+xml" href="texquisite-emblem.svg"><link rel="stylesheet" href="app.css"></head>
+<title>TeXquisite 0.122.0 — continuous scroll</title><link rel="icon" type="image/svg+xml" href="texquisite-emblem.svg"><link rel="stylesheet" href="app.css"></head>
 <body>
-<header><div class="brand"><img src="texquisite-logo.png" alt="TeXquisite" width="84" height="30"></div><div class="actions"><button id="toggleProject" aria-expanded="false">Project</button><button id="new">New…</button><button id="open">Open…</button><button id="save">Save</button><button id="reload">Reload disk</button><button id="saveCopy">Save copy…</button><button id="build" class="primary">Build now <kbd>Ctrl B</kbd></button><button id="live" title="Automatically save and rebuild while typing">● Live — pause</button><button id="cancel">Cancel build</button><select id="panelLayout" aria-label="Panel layout" title="Arrange source and output panels"><option value="side-by-side">Side by side</option><option value="output-top">Output above source</option><option value="source-top">Source above output</option></select><button id="toggleStatus" aria-pressed="true">Status bar</button><button id="toggleProblems">Problems</button><button id="toggleLog">Build log</button><button id="settings">Settings</button></div></header><div id="toolchainNotice" role="status" hidden style="padding:6px 12px;background:#fff2cf;color:#352900"><span id="toolchainNoticeText"></span> <button id="toolchainNoticeSettings" type="button">Build settings…</button></div>
+<header>
+  <div class="brand"><img src="texquisite-logo.png" alt="TeXquisite" width="84" height="30"></div>
+  <div class="actions">
+    <button id="toggleProject" aria-expanded="false" title="Toggle file explorer (Cmd+Shift+P)">Files</button>
+    <button id="openFolderHeader" title="Open project folder (Cmd+Shift+O)">Open Folder…</button>
+    <button id="new">New…</button>
+    <button id="open">Open…</button>
+    <button id="save">Save</button>
+    <button id="reload">Reload disk</button>
+    <button id="saveCopy">Save copy…</button>
+    <button id="build" class="primary">Build now <kbd>⌘B</kbd></button>
+    <button id="live" title="Automatically save and rebuild while typing">● Live — pause</button>
+    <button id="cancel">Cancel build</button>
+    <select id="panelLayout" aria-label="Panel layout" title="Arrange source and output panels">
+      <option value="side-by-side">Side by side</option>
+      <option value="output-top">Output above source</option>
+      <option value="source-top">Source above output</option>
+    </select>
+    <button id="toggleStatus" aria-pressed="true">Status bar</button>
+    <button id="toggleProblems">Problems</button>
+    <button id="toggleLog">Build log</button>
+    <button id="toggleTheme" title="Appearance: Switch theme">Theme</button>
+    <button id="settings" title="Preferences (Cmd+,)">Preferences</button>
+  </div>
+</header>
+<div id="toolchainNotice" role="status" hidden class="app-banner banner-warning">
+  <span class="banner-icon">⚠</span>
+  <span id="toolchainNoticeText"></span>
+  <div class="banner-actions">
+    <button id="toolchainNoticeSettings" type="button">Preferences…</button>
+    <button id="dismissToolchainNotice" type="button" class="banner-close" title="Dismiss notice">✕</button>
+  </div>
+</div>
 
-<section id="diagnostics" hidden aria-label="Build error" aria-live="polite"><div class="diagnostic-copy"><strong id="diagnosticMessage"></strong><span id="diagnosticHint"></span><span id="diagnosticState"></span></div><button id="diagnosticLocation" hidden></button><button id="diagnosticLog">Open build log</button></section>
-<div id="backupWarning" hidden role="alert"><span></span><button id="reviewBackups">Review backups</button></div>
-<div id="projectWorkspace"><aside id="projectSidebar" hidden aria-label="Project navigation"><div class="project-heading"><strong>Project</strong><button id="projectSearch" title="Find and replace in project (Ctrl+Shift+F)" aria-label="Find and replace in project">⌕</button><button id="refreshProject" title="Refresh project files">↻</button></div><div id="projectRoot"></div><label class="project-filter">Filter file names<input id="projectFileFilter" type="search" placeholder="Find a file…"></label><nav id="projectFiles" aria-label="Project files"></nav><details id="outlinePanel" open><summary>Document outline</summary><div id="outlineFile"></div><nav id="documentOutline" aria-label="Document outline"></nav></details></aside><main id="workspace" data-panel-layout="side-by-side">
-<section class="source" id="sourcePane"><div class="pane-title"><span>SOURCE</span><button id="autoClose" aria-pressed="true" title="Match delimiters, wrap selections and synchronize environment names; type a generated closer to move past it">Match pairs: on</button><button id="support">Support files…</button><button id="root">Use active file as root</button></div><nav id="tabs" aria-label="Open files"></nav><div id="editor"></div><div id="welcome"><h1>Your source.<br>Your last good preview.</h1><p>Write ordinary LaTeX. A broken build keeps the previous document right where you left it.</p><button id="example" class="primary">Try a mathematical example</button><p class="hint">Local files · Standard TeX tools · No account</p></div><footer id="rootLabel">No root selected</footer></section>
-<div id="panelDivider" role="separator" tabindex="0" aria-label="Resize source and output panels" aria-controls="sourcePane previewPane" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="85" aria-valuenow="50" title="Drag to resize; arrow keys move the divider; double-click for equal sizes"></div>
-<section class="preview" id="previewPane"><div class="pane-title"><span>COMPILED DOCUMENT</span><div><button id="previous">Previous version</button><button id="export">Export PDF…</button></div></div><div class="pdf-toolbar"><button id="prevPage" aria-label="Previous page">←</button><span id="pageLabel">No document</span><button id="nextPage" aria-label="Next page">→</button><select id="zoom" aria-label="Zoom"><option value="fit-width">Fit width</option><option value="0.8">80%</option><option value="1" selected>100%</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select><select id="previewMode" aria-label="Working mode"><option value="document">Document mode</option><option value="lecture">Lecture mode</option></select><select id="layoutMode" aria-label="Preview layout"><option value="paged">Paged PDF</option><option value="continuous">Continuous scroll</option></select><button id="editPreview" aria-pressed="false" title="Edit verified text and supported math; unsupported regions use the source editor">Edit preview: off</button><button id="locate" title="Show the source cursor in the PDF (Ctrl+Enter)">Show in PDF</button><button id="follow" aria-pressed="false">Follow typing: off</button></div>
-<div id="mathTools" class="navigation-toolbar" hidden aria-label="Math editing tools"><span>Math</span><button data-math="frac" title="Insert a fraction (Ctrl+/)">Fraction</button><button data-math="sqrt" title="Insert a square root (Ctrl+R)">Square root</button><button data-math="sup" title="Insert a superscript (^)">Superscript</button><button data-math="sub" title="Insert a subscript (_)">Subscript</button><button data-math="pi" title="Insert pi">π</button></div>
+<section id="diagnostics" hidden class="app-banner banner-error" aria-label="Build error" aria-live="polite">
+  <div class="diagnostic-copy"><strong id="diagnosticMessage"></strong><span id="diagnosticHint"></span><span id="diagnosticState"></span></div>
+  <div class="banner-actions">
+    <button id="diagnosticLocation" hidden></button>
+    <button id="diagnosticLog">Open build log</button>
+    <button id="dismissDiagnostics" type="button" class="banner-close" title="Dismiss error banner">✕</button>
+  </div>
+</section>
+<div id="backupWarning" hidden class="app-banner banner-warning" role="alert">
+  <span id="backupWarningText"></span>
+  <div class="banner-actions">
+    <button id="reviewBackups">Review backups</button>
+    <button id="dismissBackupWarning" type="button" class="banner-close" title="Dismiss">✕</button>
+  </div>
+</div>
 
-<div id="pdfViewport"><div id="empty"><span class="paper-icon">∑</span><h2>Your PDF will appear here</h2><p>Open a .tex file and start typing.<br>A failed build will never replace a successful preview.</p></div><div id="pages"></div><textarea id="previewInput" tabindex="-1" aria-label="Edit text or math in the PDF" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea></div></section>
-</main></div>
-<details id="problems"><summary>Problems <span id="problemSummary">No problems</span></summary><div class="problem-controls"><label>Show <select id="problemFilter"><option value="all">All</option><option value="error">Errors</option><option value="warning">Warnings</option></select></label><span id="problemState"></span></div><div id="problemList" role="list" aria-label="Project problems"></div></details>
-<details id="logs"><summary>Build log <span>Compiler messages and errors</span></summary><pre id="log"></pre></details>
-<footer id="statusBar" aria-label="Document status"><button id="errorCount" type="button" aria-label="No errors. Show problems" aria-live="polite" aria-atomic="true">0 errors</button><aside id="previewNotice" hidden role="status" aria-live="polite"><div><strong id="previewNoticeTitle"></strong><span id="previewNoticeText"></span></div><div class="preview-notice-actions"><button id="previewNoticeApply" hidden></button><button id="previewNoticeError">Go to error</button><button id="previewNoticeRetry">Retry preview</button><button id="previewNoticeDetails">Details</button></div></aside><div id="statusDetails"><span id="status" role="status">Open a LaTeX document to begin.</span><span id="previewState" role="status">Automatic preview</span><span id="navState" role="status">Click PDF text to show its source</span></div></footer>
-<dialog id="settingsDialog"><form method="dialog"><h2>Build settings</h2><label>TeX executable folder<input id="texBin" list="texInstallations" placeholder="Detect automatically"></label><datalist id="texInstallations"></datalist><div><button id="detectTeX" type="button">Detect installations</button> <button id="browseTeX" type="button">Choose folder…</button> <button id="checkTeX" type="button">Check installation</button></div><p id="toolchainSummary" role="status"></p><button id="prepareFastFormat" type="button" disabled>Prepare matching fast preview</button><p id="formatPreparation" role="status"></p><details><summary>Tools, packages and fast preview</summary><pre id="toolchainDetails" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto"></pre></details><p>TeXquisite uses your installed TeX files. Windows with TeX Live is the supported initial setup; MiKTeX native compilation is experimental. Missing packages must be installed with your TeX distribution’s package manager.</p><label>TeX engine<select id="engine"><option>pdflatex</option><option>xelatex</option><option>lualatex</option><option value="latex">LaTeX → PostScript → PDF (PSTricks)</option></select></label><label>latexmk executable<input id="latexmk" value="latexmk"></label><label class="check"><input type="checkbox" id="onSave" checked> Automatically save and rebuild while typing</label><p>Edits are submitted to the preview immediately and saved automatically. A save conflict preserves your draft while the preview continues to compile it. Pause Live to edit without saving.</p><p>Compilation uses a 120-second timeout. Shell escape and latexmk configuration files are disabled in this prototype.</p><p>Unused compiler caches expire after seven days or when they exceed 512 MB where safe. Active projects and preview navigation are retained.</p><button id="cleanCaches" type="button">Clean unused caches</button><p id="cacheStatus" role="status">Sources, drafts and accepted previews are kept.</p><div class="dialog-actions"><button value="cancel">Cancel</button><button id="applySettings" class="primary" value="default">Apply</button></div></form></dialog>
-<dialog id="backupsDialog"><h2>Source backups</h2><p>Changed open source files are backed up every five minutes, when opened, and when closing. This includes unsaved drafts while Live is paused.</p><label class="check"><input type="checkbox" id="automaticBackups" checked> Automatically back up source files</label><label>Snapshot<select id="backupSnapshots"></select></label><label>Source file<select id="backupFiles"></select></label><p id="backupOriginal"></p><p id="backupStatus" role="status"></p><p>Keep 20 recent snapshots per document, plus hourly copies for a day and daily copies for two weeks, within 200 snapshots and 128 MB total. Images and other project assets are not included. Backups are stored locally in the app profile.</p><div class="dialog-actions"><button id="backupNow" type="button">Back up now</button><button id="restoreBackup" type="button">Recover as new file…</button><button id="closeBackups" type="button">Close</button></div></dialog>
-<dialog id="projectSearchDialog"><h2>Find and replace in project</h2><form id="projectSearchForm"><label>Find<input id="projectSearchQuery" required></label><label>Replace with<input id="projectSearchReplacement"></label><div class="search-options"><label><input id="projectSearchRegex" type="checkbox"> Regular expression</label><label><input id="projectSearchCase" type="checkbox" checked> Match case</label><label><input id="projectSearchSupport" type="checkbox"> Include support folders</label></div><p>Search uses open drafts. Regex replacements support $1, $&lt;name&gt;, $&amp; and $$. Review and select changes below before replacing. Undo works separately in each changed file.</p><button id="runProjectSearch" type="submit">Search / preview</button></form><p id="projectSearchStatus" role="status"></p><div class="search-options"><button id="selectSearchAll">Select all</button><button id="selectSearchNone">Select none</button></div><div id="projectSearchResults" role="list" aria-label="Search results"></div><div class="dialog-actions"><button id="closeProjectSearch">Close</button><button id="applyProjectSearch" disabled>Replace selected</button></div></dialog>
-<script type="module" src="renderer.js"></script></body></html>
+<div id="projectWorkspace">
+  <aside id="projectSidebar" hidden aria-label="Project navigation">
+    <div class="project-heading">
+      <span class="project-title">PROJECT FILES</span>
+      <div class="project-actions">
+        <button id="openFolder" title="Open Folder (Cmd+Shift+O)" aria-label="Open folder">
+          <svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        </button>
+        <button id="newProjectFile" title="New File" aria-label="New file">
+          <svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+        </button>
+        <button id="newProjectFolder" title="New Folder" aria-label="New folder">
+          <svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path><line x1="12" y1="11" x2="12" y2="17"></line><line x1="9" y1="14" x2="15" y2="14"></line></svg>
+        </button>
+        <button id="projectSearch" title="Find in Project (Cmd+Shift+F)" aria-label="Find in project">
+          <svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        </button>
+        <button id="refreshProject" title="Refresh files" aria-label="Refresh files">
+          <svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+        </button>
+      </div>
+    </div>
+    <div id="projectRoot"></div>
+    <label class="project-filter">Filter files<input id="projectFileFilter" type="search" placeholder="Find a file…"></label>
+    <nav id="projectFiles" aria-label="Project files"></nav>
+    <details id="outlinePanel" open>
+      <summary>Document outline</summary>
+      <div id="outlineFile"></div>
+      <nav id="documentOutline" aria-label="Document outline"></nav>
+    </details>
+  </aside>
+
+  <main id="workspace" data-panel-layout="side-by-side">
+    <section class="source" id="sourcePane">
+      <div class="pane-title">
+        <span>SOURCE</span>
+        <button id="autoClose" aria-pressed="true" title="Match delimiters, wrap selections and synchronize environment names; type a generated closer to move past it">Match pairs: on</button>
+        <button id="support">Support files…</button>
+        <button id="root">Use active file as root</button>
+      </div>
+      <nav id="tabs" aria-label="Open files"></nav>
+      <div id="editor"></div>
+      <div id="welcome">
+        <h1>Your source.<br>Your last good preview.</h1>
+        <p>Write ordinary LaTeX. A broken build keeps the previous document right where you left it.</p>
+        <div class="welcome-actions">
+          <button id="welcomeOpenFolder" class="primary"><svg class="app-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>Open Project Folder</button>
+          <button id="example">Try a mathematical example</button>
+        </div>
+        <p class="hint">Local files · Standard TeX tools · 100% Offline</p>
+      </div>
+      <footer id="rootLabel">No root selected</footer>
+    </section>
+
+    <div id="panelDivider" role="separator" tabindex="0" aria-label="Resize source and output panels" aria-controls="sourcePane previewPane" aria-orientation="vertical" aria-valuemin="15" aria-valuemax="85" aria-valuenow="50" title="Drag to resize; arrow keys move the divider; double-click for equal sizes"></div>
+
+    <section class="preview" id="previewPane">
+      <div class="pane-title">
+        <span>COMPILED DOCUMENT</span>
+        <div><button id="previous">Previous version</button><button id="export">Export PDF…</button></div>
+      </div>
+      <div class="pdf-toolbar">
+        <button id="prevPage" aria-label="Previous page">←</button>
+        <span id="pageLabel">No document</span>
+        <button id="nextPage" aria-label="Next page">→</button>
+        <select id="zoom" aria-label="Zoom">
+          <option value="fit-width">Fit width</option>
+          <option value="0.8">80%</option>
+          <option value="1" selected>100%</option>
+          <option value="1.25">125%</option>
+          <option value="1.5">150%</option>
+          <option value="2">200%</option>
+        </select>
+        <button id="togglePdfInvert" title="Toggle Inverted Dark PDF vs Natural White Paper">White PDF</button>
+        <select id="layoutMode" aria-label="Preview layout">
+          <option value="continuous" selected>Continuous scroll</option>
+          <option value="paged">Paged PDF</option>
+        </select>
+        <select id="previewMode" aria-label="Working mode">
+          <option value="document">Document mode</option>
+          <option value="lecture">Lecture mode</option>
+        </select>
+        <button id="editPreview" aria-pressed="false" title="Edit verified text and supported math; unsupported regions use the source editor">Edit preview: off</button>
+        <button id="locate" title="Show the source cursor in the PDF (Cmd+Enter)">Show in PDF</button>
+        <button id="follow" aria-pressed="false">Follow typing: off</button>
+      </div>
+      <div id="mathTools" class="navigation-toolbar" aria-label="Math editing tools">
+        <span>Math</span>
+        <button data-math="frac" title="Insert a fraction (Alt+F)">a/b</button>
+        <button data-math="sqrt" title="Insert a square root (Alt+R)">√x</button>
+        <button data-math="inline" title="Insert inline math ($...$) (Alt+M)">$ $</button>
+        <button data-math="display" title="Insert display math (\[...\]) (Alt+D)">\[ \]</button>
+        <button data-math="sum" title="Insert summation (Alt+S)">∑</button>
+        <button data-math="int" title="Insert integral (Alt+I)">∫</button>
+        <button data-math="sup" title="Insert a superscript (Alt+Shift+6)">xⁿ</button>
+        <button data-math="sub" title="Insert a subscript (Alt+-)">xₙ</button>
+        <button data-math="pi" title="Insert pi (Alt+P)">π</button>
+      </div>
+      <div id="pdfViewport">
+        <div id="empty"><span class="paper-icon">∑</span><h2>Your PDF will appear here</h2><p>Open a .tex file and start typing.<br>A failed build will never replace a successful preview.</p></div>
+        <div id="pages"></div>
+        <textarea id="previewInput" tabindex="-1" aria-label="Edit text or math in the PDF" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      </div>
+    </section>
+  </main>
+</div>
+
+<details id="problems">
+  <summary>Problems <span id="problemSummary">No problems</span></summary>
+  <div class="problem-controls">
+    <label>Show <select id="problemFilter"><option value="all">All</option><option value="error">Errors</option><option value="warning">Warnings</option></select></label>
+    <span id="problemState"></span>
+  </div>
+  <div id="problemList" role="list" aria-label="Project problems"></div>
+</details>
+
+<details id="logs">
+  <summary>
+    <span>Build log · Compiler output & errors</span>
+    <div class="log-actions" onclick="event.stopPropagation()">
+      <button id="copyLogBtn" type="button" title="Copy entire build log">Copy log</button>
+      <button id="clearLogBtn" type="button" title="Clear log display">Clear</button>
+      <button id="closeLogBtn" type="button" title="Close build log">✕ Close</button>
+    </div>
+  </summary>
+  <pre id="log" tabindex="0"></pre>
+</details>
+
+<footer id="statusBar" aria-label="Document status">
+  <button id="errorCount" type="button" aria-label="No errors. Show problems" aria-live="polite" aria-atomic="true">0 errors</button>
+  <button id="openLogBtn" type="button" title="Toggle build compiler log">Log</button>
+  <aside id="previewNotice" hidden role="status" aria-live="polite">
+    <div class="notice-text-wrap"><strong id="previewNoticeTitle"></strong><span id="previewNoticeText"></span></div>
+    <div class="preview-notice-actions">
+      <button id="previewNoticeApply" hidden></button>
+      <button id="previewNoticeError">Go to error</button>
+      <button id="previewNoticeRetry">Retry</button>
+      <button id="previewNoticeDetails">Details</button>
+      <button id="previewNoticeDismiss" class="notice-dismiss-btn" title="Dismiss notice">✕</button>
+    </div>
+  </aside>
+  <div id="statusDetails">
+    <span id="status" role="status">Open a LaTeX document to begin.</span>
+    <span id="previewState" role="status">Automatic preview</span>
+    <span id="navState" role="status">Click PDF text to show its source</span>
+  </div>
+</footer>
+
+<!-- Expanded Preferences Dialog -->
+<dialog id="settingsDialog">
+  <div class="settings-modal">
+    <div class="settings-header">
+      <h2>Preferences</h2>
+      <button id="closeSettingsX" type="button" class="close-x" aria-label="Close">✕</button>
+    </div>
+    <nav class="settings-tabs" role="tablist">
+      <button type="button" class="tab-btn active" data-tab="tab-appearance" role="tab">Appearance</button>
+      <button type="button" class="tab-btn" data-tab="tab-editor" role="tab">Editor</button>
+      <button type="button" class="tab-btn" data-tab="tab-compiler" role="tab">LaTeX Engine</button>
+      <button type="button" class="tab-btn" data-tab="tab-backups" role="tab">Backups</button>
+    </nav>
+    <form method="dialog" id="settingsForm">
+      <!-- Appearance Tab -->
+      <section id="tab-appearance" class="settings-tab-pane active" role="tabpanel">
+        <label>Theme
+          <select id="prefTheme">
+            <option value="auto">System (Automatic)</option>
+            <option value="dark">Dark (Obsidian)</option>
+            <option value="midnight">Midnight (OLED Pure Black)</option>
+            <option value="nord">Nord (Arctic Navy)</option>
+            <option value="light">Light (Studio Clean)</option>
+            <option value="warm">Warm (Sepia Paper)</option>
+          </select>
+        </label>
+        <p class="setting-desc">App UI and editor color scheme.</p>
+        
+        <label class="check">
+          <input type="checkbox" id="prefPdfInvert">
+          Invert PDF in dark themes (Dark PDF)
+        </label>
+        <p class="setting-desc">When unchecked, PDF pages render in natural white paper mode even when your editor is dark.</p>
+        
+        <label>Editor Font Size
+          <select id="prefFontSize">
+            <option value="12">12 px — Compact</option>
+            <option value="13">13 px — Small</option>
+            <option value="14" selected>14 px — Standard</option>
+            <option value="15">15 px — Medium</option>
+            <option value="16">16 px — Large</option>
+            <option value="18">18 px — Extra Large</option>
+          </select>
+        </label>
+      </section>
+
+      <!-- Editor Tab -->
+      <section id="tab-editor" class="settings-tab-pane" role="tabpanel" hidden>
+        <label class="check">
+          <input type="checkbox" id="prefAutoClose" checked>
+          Match delimiter pairs &amp; synchronize environments (\begin{…}\end{…})
+        </label>
+        <p class="setting-desc">Automatically pairs braces, quotes, and environments as you type.</p>
+
+        <label class="check">
+          <input type="checkbox" id="prefFollowPreview">
+          Follow cursor in PDF preview while typing
+        </label>
+        <p class="setting-desc">Keeps the compiled PDF location in view near your typing cursor.</p>
+
+        <label class="check">
+          <input type="checkbox" id="prefPreviewEditing">
+          Direct PDF editing
+        </label>
+        <p class="setting-desc">Allows editing text directly inside the rendered PDF.</p>
+      </section>
+
+      <!-- Compiler Tab -->
+      <section id="tab-compiler" class="settings-tab-pane" role="tabpanel" hidden>
+        <label>TeX installation binary folder
+          <input id="texBin" list="texInstallations" placeholder="Detect automatically (/Library/TeX/texbin)">
+        </label>
+        <datalist id="texInstallations"></datalist>
+        <div class="button-row">
+          <button id="detectTeX" type="button">Detect installations</button>
+          <button id="browseTeX" type="button">Choose folder…</button>
+          <button id="checkTeX" type="button">Check installation</button>
+        </div>
+        <p id="toolchainSummary" role="status"></p>
+        <button id="prepareFastFormat" type="button" disabled>Prepare matching fast preview</button>
+        <p id="formatPreparation" role="status"></p>
+        <details>
+          <summary>Tools, packages and fast preview details</summary>
+          <pre id="toolchainDetails" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:auto"></pre>
+        </details>
+        <label>TeX engine
+          <select id="engine">
+            <option value="pdflatex">pdflatex (Fastest, default)</option>
+            <option value="xelatex">xelatex (Unicode &amp; Modern Fonts)</option>
+            <option value="lualatex">lualatex (LuaTeX scripting)</option>
+            <option value="latex">LaTeX → PostScript → PDF</option>
+          </select>
+        </label>
+        <label>latexmk executable
+          <input id="latexmk" value="latexmk">
+        </label>
+        <label class="check">
+          <input type="checkbox" id="onSave" checked>
+          Automatically save and rebuild while typing (Live Mode)
+        </label>
+        <p class="setting-desc">Immediate preview feedback as you write.</p>
+        <button id="cleanCaches" type="button">Clean unused caches</button>
+        <p id="cacheStatus" role="status">Sources, drafts, and active previews are protected.</p>
+      </section>
+
+      <!-- Backups Tab -->
+      <section id="tab-backups" class="settings-tab-pane" role="tabpanel" hidden>
+        <label class="check">
+          <input type="checkbox" id="automaticBackups" checked>
+          Automatically back up source files
+        </label>
+        <p class="setting-desc">Changed files are snapshotted every five minutes. 100% offline and stored in your user profile.</p>
+        <div class="button-row">
+          <button id="settingsBackupNow" type="button">Back up now</button>
+          <button id="settingsReviewBackups" type="button">Browse &amp; recover backups…</button>
+        </div>
+        <p id="settingsBackupStatus">Backups are active.</p>
+      </section>
+
+      <div class="dialog-actions">
+        <button type="button" id="cancelSettings" value="cancel">Close</button>
+        <button id="applySettings" class="primary" value="default">Apply</button>
+      </div>
+    </form>
+  </div>
+</dialog>
+
+<!-- Backups Modal -->
+<dialog id="backupsDialog">
+  <h2>Source backups</h2>
+  <p>Changed open source files are backed up every five minutes, when opened, and when closing.</p>
+  <label>Snapshot<select id="backupSnapshots"></select></label>
+  <label>Source file<select id="backupFiles"></select></label>
+  <p id="backupOriginal"></p>
+  <p id="backupStatus" role="status"></p>
+  <p class="setting-desc">Keep 20 recent snapshots per document, plus hourly copies for a day and daily copies for two weeks.</p>
+  <div class="dialog-actions">
+    <button id="backupNow" type="button">Back up now</button>
+    <button id="restoreBackup" type="button">Recover as new file…</button>
+    <button id="closeBackups" type="button">Close</button>
+  </div>
+</dialog>
+
+<!-- Project Search Modal -->
+<dialog id="projectSearchDialog">
+  <div class="dialog-header">
+    <h2>Find and replace in project</h2>
+    <button type="button" class="close-x" id="closeProjectSearchHeader" aria-label="Close dialog">✕</button>
+  </div>
+  <form id="projectSearchForm">
+    <label>Find<input id="projectSearchQuery" required></label>
+    <label>Replace with<input id="projectSearchReplacement"></label>
+    <div class="search-options">
+      <label><input id="projectSearchRegex" type="checkbox"> Regular expression</label>
+      <label><input id="projectSearchCase" type="checkbox" checked> Match case</label>
+      <label><input id="projectSearchSupport" type="checkbox"> Include support folders</label>
+    </div>
+    <button id="runProjectSearch" type="submit">Search / preview</button>
+  </form>
+  <p id="projectSearchStatus" role="status"></p>
+  <div class="search-options">
+    <button id="selectSearchAll" type="button">Select all</button>
+    <button id="selectSearchNone" type="button">Select none</button>
+  </div>
+  <div id="projectSearchResults" role="list" aria-label="Search results"></div>
+  <div class="dialog-actions">
+    <button type="button" id="closeProjectSearch">Close</button>
+    <button id="applyProjectSearch" disabled>Replace selected</button>
+  </div>
+</dialog>
+
+<!-- File / Folder Action Prompt Dialog -->
+<dialog id="fileActionDialog">
+  <form id="fileActionForm" method="dialog">
+    <h3 id="fileActionTitle">New File</h3>
+    <p id="fileActionFolder" class="setting-desc"></p>
+    <label id="fileActionLabel">Name
+      <input id="fileActionInput" required autofocus>
+    </label>
+    <div class="dialog-actions">
+      <button type="button" id="cancelFileAction" value="cancel">Cancel</button>
+      <button type="submit" id="submitFileAction" class="primary" value="default">OK</button>
+    </div>
+  </form>
+</dialog>
+
+<script type="module" src="renderer.js"></script>
+</body>
+</html>

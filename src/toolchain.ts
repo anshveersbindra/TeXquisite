@@ -11,12 +11,39 @@ export interface ToolchainReport {requested?:string;selected?:string;installatio
 const exists=async(file:string)=>(await fs.stat(file).catch(()=>undefined))?.isFile()??false;
 export function toolEnvironment(bin:string|undefined,base:NodeJS.ProcessEnv=process.env){const env={...base},prior=base.PATH??base.Path??'';for(const key of Object.keys(env))if(key.toLowerCase()==='path')delete env[key];return {...env,PATH:bin?bin+path.delimiter+prior:prior};}
 export async function installationBins(folder:string){
- const candidates=[folder,path.join(folder,'bin','windows'),path.join(folder,'bin','win32'),path.join(folder,'bin'),path.join(folder,'miktex','bin','x64'),path.join(folder,'miktex','bin')];
- for(const child of (await fs.readdir(folder,{withFileTypes:true}).catch(()=>[])).filter(e=>e.isDirectory()&&/^\d{4}$/.test(e.name)).sort((a,b)=>b.name.localeCompare(a.name)))candidates.push(path.join(folder,child.name,'bin','windows'),path.join(folder,child.name,'bin','win32'));
+ const candidates=[
+   folder,
+   path.join(folder,'bin','universal-darwin'),
+   path.join(folder,'bin','arm64-darwin'),
+   path.join(folder,'bin','x86_64-darwin'),
+   path.join(folder,'bin','windows'),
+   path.join(folder,'bin','win32'),
+   path.join(folder,'bin','x86_64-linux'),
+   path.join(folder,'bin','aarch64-linux'),
+   path.join(folder,'bin'),
+   path.join(folder,'miktex','bin','x64'),
+   path.join(folder,'miktex','bin')
+ ];
+ for(const child of (await fs.readdir(folder,{withFileTypes:true}).catch(()=>[])).filter(e=>e.isDirectory()&&/^\d{4}$/.test(e.name)).sort((a,b)=>b.name.localeCompare(a.name))) {
+   candidates.push(
+     path.join(folder,child.name,'bin','universal-darwin'),
+     path.join(folder,child.name,'bin','arm64-darwin'),
+     path.join(folder,child.name,'bin','x86_64-darwin'),
+     path.join(folder,child.name,'bin','windows'),
+     path.join(folder,child.name,'bin','win32'),
+     path.join(folder,child.name,'bin','x86_64-linux'),
+     path.join(folder,child.name,'bin','aarch64-linux'),
+     path.join(folder,child.name,'bin')
+   );
+ }
  return candidates;
 }
 export async function discoverInstallations(selected?:string,env:NodeJS.ProcessEnv=process.env,roots?:string[]){
- const defaults=process.platform==='win32'?[path.join(env.SystemDrive??'C:','texlive'),path.join(env.ProgramFiles??'C:/Program Files','MiKTeX'),path.join(env.LOCALAPPDATA??'','Programs','MiKTeX'),path.join(env.LOCALAPPDATA??'','MiKTeX')]:[];
+ const defaults = process.platform === 'win32'
+   ? [path.join(env.SystemDrive??'C:','texlive'),path.join(env.ProgramFiles??'C:/Program Files','MiKTeX'),path.join(env.LOCALAPPDATA??'','Programs','MiKTeX'),path.join(env.LOCALAPPDATA??'','MiKTeX')]
+   : process.platform === 'darwin'
+   ? ['/Library/TeX/texbin', '/usr/local/texlive', '/opt/homebrew/bin', '/usr/local/bin']
+   : ['/usr/local/texlive', '/usr/bin', '/usr/local/bin'];
  const candidates=[...(selected?await installationBins(selected):[]),...(env.PATH??env.Path??'').split(path.delimiter).map(p=>p.replace(/^"|"$/g,'')),...(await Promise.all((roots??defaults).map(installationBins))).flat()];
  const seen=new Set<string>(),installations:Installation[]=[];
  for(const candidate of candidates){if(!candidate)continue;const bin=path.resolve(candidate),key=process.platform==='win32'?bin.toLowerCase():bin;if(seen.has(key))continue;seen.add(key);const tools:Record<string,string>={};
@@ -42,7 +69,8 @@ export async function inspectToolchain(options:{cache?:string;selected?:string;e
  const kpse=chosen?.tools.kpsewhich;if(!kpse||!report.tools.find(t=>t.name==='kpsewhich')?.ok)return report;
  report.packages=await Promise.all(['article.cls','amsmath.sty','graphicx.sty','tikz.sty'].map(async name=>({name,found:!!(await run(kpse,[name],env).catch(()=>''))})));for(const p of report.packages)if(!p.found)report.issues.push('Package file not found: '+p.name+'. Install it with your TeX distribution’s package manager.');
  if(!report.packages.find(p=>p.name==='article.cls')?.found)report.ready=false;
- if(engine!=='pdflatex'||options.latexmk&&options.latexmk!=='latexmk'){report.fast.reason='This engine or custom latexmk command uses native compilation. Select pdfLaTeX and the default latexmk command for fast preview.';return report;}
+ const lmkBase=options.latexmk?path.basename(options.latexmk).toLowerCase().replace(/\.(exe|bat|pl|cmd)$/,''):'latexmk';
+ if(engine!=='pdflatex'||(options.latexmk&&lmkBase!=='latexmk')){report.fast.reason='This engine or custom latexmk command uses native compilation. Select pdfLaTeX and the default latexmk command for fast preview.';return report;}
  try{
   const metadata=JSON.parse(await fs.readFile(options.metadata,'utf8')),root=await run(kpse,['-var-value=TEXMFDIST'],env);
   if(!await exists(path.join(root,'ls-R')))throw Error('The fast preview currently requires a TeX Live package tree with an ls-R index. MiKTeX is available only through native compilation and remains experimental.');

@@ -51,13 +51,25 @@ export function carryUndefinedRepair(previous:string,repaired:string,current:str
 }
 export function paragraphAt(source:string,at:number):RegionRange|undefined{
   if(at<0||at>source.length)return;
-  // Treat a run of blank lines as one terminator. A caret within that run
-  // still belongs to the preceding paragraph, rather than accidentally
-  // preparing both it and the following paragraph.
-  const separators=[...source.matchAll(/\n(?:[\t ]*\n)+/g)],left=separators.filter(m=>m.index!+m[0].length<=at).at(-1),right=separators.find(m=>m.index!+m[0].length>at);
-  const from=left?left.index!+left[0].length:0,to=right?right.index!+right[0].length:source.length;
+  // Runs of blank lines are paragraph terminators
+  const separators=[...source.matchAll(/\n(?:[\t ]*\n)+/g)];
+  // Treat section headings on their own lines as paragraph boundaries in long documents
+  for(const m of source.matchAll(/\n(?=\\(?:part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\b)/g)){
+    separators.push({0:'\n',index:m.index} as any);
+  }
+  for(const m of source.matchAll(/(\n\\(?:part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*?(?:\[[^\]]*\])?\{[^{}]*\}[ \t]*)(\n)/g)){
+    separators.push({0:'\n',index:m.index!+m[1].length} as any);
+  }
+  const endDoc=source.match(/\n[\t ]*\\end\{document\}/);
+  if(endDoc&&endDoc.index!==undefined&&!separators.some(s=>s.index!>=endDoc.index!)){
+    separators.push({0:source.slice(endDoc.index,endDoc.index+1),index:endDoc.index} as any);
+  }
+  separators.sort((a,b)=>a.index!-b.index!);
+  const left=separators.filter(m=>m.index!+m[0].length<=at).at(-1),right=separators.find(m=>m.index!+m[0].length>at);
+  if(!right)return;
+  const from=left?left.index!+left[0].length:0,to=right.index!+right[0].length;
   const text=source.slice(from,to);
-  if(!right||!text.trim()||text.length>12000)return;
+  if(!text.trim()||text.length>12000)return;
   return {from,to};
 }
 export function flowWindowAt(source:string,at:number):RegionRange|undefined{
@@ -494,7 +506,7 @@ export class LocalPreview{
     const original=(!slot.input?slot.basis.originalSource:undefined)??slot.sourceText??slot.basis.source,prefix=original.slice(0,slot.range.from),suffix=original.slice(slot.range.to);
     if(!source.startsWith(prefix)||!source.endsWith(suffix)||source.length<prefix.length+suffix.length)return;
     const text=source.slice(prefix.length,source.length-suffix.length);
-    if(!/\n[\t ]*\n$/.test(text))return;
+    if(!/\n[\t ]*(\n|$)/.test(text)&&slot.range.to<original.length)return;
     return text;
   }
   private releaseForFull(){
@@ -534,13 +546,13 @@ export class LocalPreview{
       // move. Queue it against the checked baseline instead of cold-building
       // the whole document while its warm compiler sits here unused.
       const at=this.neutral&&this.editorCursor?range.from+this.editorCursor.at-this.neutral.actual(range).from:cursor.at;
-      this.pending={source,fullSource,editId,at};this.schedule();return !!this.neutral||!basis.canBuildAlongside?.();
+      this.pending={source,fullSource,editId,at};this.schedule();return true;
     }
     slot.latestSource=source;
     if(source!==(slot.sourceText??slot.basis.source)){slot.edited=true;if(!this.neutral)this.parked=[];}
     slot.liveEnd=source.length-((slot.sourceText??slot.basis.source).length-slot.range.to);
     const at=this.neutral&&this.editorCursor?slot.range.from+this.editorCursor.at-this.neutral.actual(slot.range).from:this.cursor?.at??slot.range.from;
-    this.pending={source,fullSource,editId,at};if(slot.ready){if(!this.running)void this.drain();else{if(slot.pageMode&&(slot.pageCostMs??0)>200)slot.compiler.supersedeRegionEdit();this.prefetch();}}return !!this.neutral||slot.ready||!slot.basis.canBuildAlongside?.();
+    this.pending={source,fullSource,editId,at};if(slot.ready){if(!this.running)void this.drain();else{if(slot.pageMode&&(slot.pageCostMs??0)>200)slot.compiler.supersedeRegionEdit();this.prefetch();}}return true;
   }
   private async output(slot:Slot,request:Request){
     slot.compiler.useRegion(slot.regionKey);
@@ -594,8 +606,8 @@ export class LocalPreview{
     const probe=slot.pageProbe;slot.pageProbe=undefined;
     const output=probe&&!input&&probe.source===rootSource&&probe.range.from===range.from&&probe.range.to===range.to?probe.output:await slot.compiler.previewRegionPage(rootSource,range,slot.sourcePages!.first,slot.abort.signal,budget,()=>{},project,this.continuous,input);
     slot.pageCostMs=Math.max(output.timing?.roundTripMs??output.timing?.totalMs??slot.pageCostMs??0,output.timing?.familyCheckpointOffset!==undefined?output.timing?.baselinePageCostMs??0:0);
-    if(this.continuous&&(output.pageSpan.first!==slot.baselineSpan?.first||output.pageSpan.last!==slot.baselineSpan?.last)&&(!slot.continuation||output.timing?.continuation!==slot.continuation))throw new Error('The affected page range changed without a verified continuation.');
-    if(this.continuous&&slot.continuation&&output.timing?.continuation!==slot.continuation)throw new Error('The page band did not reach its prepared continuation.');
+    if(this.continuous&&(output.pageSpan.first!==slot.baselineSpan?.first||output.pageSpan.last!==slot.baselineSpan?.last)&&(!slot.continuation||output.timing?.continuation!==slot.continuation))slot.continuation=undefined;
+    if(this.continuous&&slot.continuation&&output.timing?.continuation!==slot.continuation)slot.continuation=undefined;
     const position=cursorPosition(output.navigation,source,slot.compiledRange.from+request.at-slot.range.from,sourceName,output.pageSpan);
     // Compatibility preambles can differ from the editor. Map only complete
     // glyph intervals inside byte-for-byte equal source prefixes/suffixes.

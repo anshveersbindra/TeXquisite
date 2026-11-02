@@ -418,7 +418,25 @@ export class BuildController {
           this.legacyTkzCompatible=true;
         }
       }
-      if(nativeAttempted)warningLog=await fs.readFile(path.join(output,base+".log"),"utf8").catch(()=>"");
+      if(nativeAttempted){
+        warningLog=await fs.readFile(path.join(output,base+".log"),"utf8").catch(()=>"");
+        try{
+          const outFiles=await fs.readdir(output);
+          const auxExts=/\.(bbl|aux|toc|out|lot|lof|nav|snm|vrb)$/i;
+          const updatedResources:[string,Uint8Array][]=[...(project.resources??[])];
+          for(const f of outFiles){
+            if(auxExts.test(f)){
+              const content=await fs.readFile(path.join(output,f));
+              await fs.writeFile(path.join(input,f),content).catch(()=>{});
+              const idx=updatedResources.findIndex(([n])=>n===f);
+              if(idx>=0)updatedResources[idx]=[f,new Uint8Array(content)];
+              else updatedResources.push([f,new Uint8Array(content)]);
+            }
+          }
+          project.resources=updatedResources;
+          if(this.residentContext)this.residentContext.resources=updatedResources;
+        }catch{}
+      }
       const warnings=parseWarnings(warningLog,diagnosticInputs,nativeTranscript).map((parsed,index):BuildDiagnostic=>{const text=parsed.file?diagnosticTexts.get(parsed.file):undefined;return {...parsed,id:this.cacheSession+"-"+revision+"-warning-"+index,root:options.root,editId:options.editId,...(text!==undefined?{sourceHash:hash(typeof text==="string"?text.replace(/\r\n/g,"\n"):Buffer.from(text).toString("utf8").replace(/\r\n/g,"\n"))}:{})};});
       compilerFinished=true;
       if(this.activeDraft)this.activeDraft.compiling=false;
@@ -454,7 +472,7 @@ export class BuildController {
       if(recoveryIssues.length&&!localRecoveryEligible&&source.split('\n').length===compilerSource.split('\n').length){localSource=source;localRecoveryEligible=true;}
       if(recoveryIssues.length)this.log('Recovered local basis: '+JSON.stringify({eligible:localRecoveryEligible,sourceCharacters:source.length,compiledCharacters:compilerSource.length,sourceLines:source.split('\n').length,compiledLines:compilerSource.split('\n').length})+'\n');
       // Recovered output is never proof of the unmodified editor source.
-      if(backend.startsWith('Preamble')||recoveryIssues.length&&localRecoveryEligible)try{this.viewer.localBasis?.({bundle,options,source:recoveryIssues.length?localSource:source,originalSource:recoveryIssues.length?source:undefined,recoveryIssues:recoveryIssues.length?recoveryIssues:undefined,compilerSource,project,pdf,canBuildAlongside:()=>this.independentLocalOwner,takeCompiler:()=>{
+      if(backend.startsWith('Preamble')||(backend==='Native compilation.'&&pdf)||recoveryIssues.length&&localRecoveryEligible)try{this.viewer.localBasis?.({bundle,options,source:recoveryIssues.length?localSource:source,originalSource:recoveryIssues.length?source:undefined,recoveryIssues:recoveryIssues.length?recoveryIssues:undefined,compilerSource,project,pdf,canBuildAlongside:()=>this.independentLocalOwner,takeCompiler:()=>{
         // Transfer ownership only after publication and only while idle. Future
         // full verification gets its own worker; local edits cannot race it.
         // A failed local page proof may stop its transferred worker. That

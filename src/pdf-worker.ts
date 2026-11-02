@@ -116,7 +116,7 @@ worker.onmessage=event=>{
           m._FPDFBitmap_FillRect(handle,0,0,width,height,4294967295);
           m._FPDF_RenderPageBitmap(handle,raw.pageIdx,-bx,-by,size.width,size.height,0,1|2|16);
           const data=m.HEAPU8.slice(ptr,ptr+bytes),rasterMs=performance.now()-started;
-          const metadata={width,height,x,y,patchWidth:right-x,patchHeight:bottom-y,sourceX:x-bx,sourceY:y-by,fullWidth:size.width,fullHeight:size.height,originalWidth:size.originalWidth,originalHeight:size.originalHeight,rasterMs};
+          const metadata={width,height,x,y,patchWidth:right-x,patchHeight:bottom-y,sourceX:x-bx,sourceY:y-by,fullWidth:size.width,fullHeight:size.height,originalWidth:actual.originalWidth,originalHeight:actual.originalHeight,rasterMs};
           if(args.imageBitmap&&typeof OffscreenCanvas!=='undefined'){
             const canvas=new OffscreenCanvas(width,height);canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(data.buffer),width,height),0,0);const image=canvas.transferToImageBitmap();
             worker.postMessage({id,result:{...metadata,image,workerMs:performance.now()-started}},[image]);

@@ -838,9 +838,9 @@ async function renderRegion(source:string,request:RegionRequest,jobName:string,e
     if(!Number.isSafeInteger(request.page)||request.page!<1)throw new Error('Invalid affected page.');
     // Bound read-ahead to 64 KiB, and fence the literal end-document line.
     // The engine also intercepts enddocument control tokens before expansion.
-    let boundary=request.action==='band'&&!request.input&&!state.boundedPageOnly?[...bytes.toString('utf8').matchAll(/^[\t ]*\\(?:newpage|clearpage|end\{document\})[\t ]*(?:%[^\n]*)?(?:\n|$)/gm)].map(m=>({from:Buffer.byteLength(bytes.toString('utf8').slice(0,m.index)),to:Buffer.byteLength(bytes.toString('utf8').slice(0,m.index!+m[0].length)),final:m[0].includes('end{document}')})).find(m=>m.from>=request.end&&m.to<=request.end+65536):undefined;
+    let boundary=(request.action==='page'||request.action==='band')&&!request.input&&!state.boundedPageOnly?[...bytes.toString('utf8').matchAll(/^[\t ]*\\(?:newpage|clearpage|end\{document\})[\t ]*(?:%[^\n]*)?(?:\n|$)/gm)].map(m=>({from:Buffer.byteLength(bytes.toString('utf8').slice(0,m.index)),to:Buffer.byteLength(bytes.toString('utf8').slice(0,m.index!+m[0].length)),final:m[0].includes('end{document}')})).find(m=>m.from>=request.end&&m.to<=request.end+65536):undefined;
     const endDocument=bytes.indexOf(Buffer.from('\\end{document}'),request.end);
-    const endLine=endDocument<0?bytes.length:bytes.lastIndexOf(10,endDocument)+1;
+    const endLine=endDocument<0?bytes.length:Math.max(request.end+16,endDocument+Buffer.byteLength('\\end{document}')+1);
     let continuationCaptured=false,continuationCaptureMs=0,continuationReusedBytes=0,continuationPrefixBytes=0,continuationPrefixRetained=false,resumeBoundaries:number[]=[];
     let editedFamily:Checkpoint|undefined,editedFamilyCaptureMs=0;
     const familyOffset=canCaptureFamily?pictureWitnessRanges(bytes.toString('utf8'),request.start).filter(r=>r.start>request.start&&r.start<request.end).sort((a,b)=>a.start-b.start)[0]?.start:undefined;
@@ -909,9 +909,8 @@ async function renderRegion(source:string,request:RegionRequest,jobName:string,e
       }
     };
     const resumePage=()=>{
-      const work=boundary?Buffer.concat([bytes.subarray(0,boundary.final?boundary.from:boundary.to),Buffer.from(boundary.final?'\\clearpage\n\n':'\n')]):bytes;
-      const limit=request.input?Math.min(bytes.length+1,request.end+65536):boundary?work.length:Math.min(bytes.length,request.end+65536,endLine);
-      if(limit<=request.end)throw new Error('The final page requires normal document completion.');
+      const work=boundary?Buffer.concat([bytes.subarray(0,boundary.final?boundary.from:boundary.to),Buffer.from(boundary.final?'\n\\clearpage\n\\end{document}\n':'\n')]):Buffer.concat([bytes,Buffer.from('\n\\clearpage\n\n')]);
+      const limit=request.input?Math.min(bytes.length+1,request.end+65536):work.length;
       writeWork(request.input?.file??jobName+'.tex',work);Module._persistentEnableCharacters(characterMapping?1:0);
       // A later family checkpoint has already completed unchanged preceding
       // pages. Start output at its live page; the checked continuation still
@@ -926,7 +925,7 @@ async function renderRegion(source:string,request:RegionRequest,jobName:string,e
     // A distant explicit break/end can exceed the three-page band even when
     // the edited paragraph fits one page. Restore and try its natural page
     // boundary; baseline raster and unchanged-span checks still gate reuse.
-    if(code===106&&boundary){
+    if((code===105||code===106)&&boundary){
       if(continuationCaptured)pageContinuation=undefined;continuationCaptured=false;continuationPrefixBytes=0;continuationPrefixRetained=false;editedFamily=undefined;
       restore(checkpoint);readyCheckpoint=undefined;
       const navigationFile='/work/.persistent-tex/navigation.jsonl';

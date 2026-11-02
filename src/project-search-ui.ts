@@ -6,7 +6,12 @@ export class ProjectSearchUI{
  constructor(private call:(method:string,...args:unknown[])=>Promise<any>,private flush:()=>Promise<void>,private navigate:(result:any)=>void,private replace:(result:any)=>void){
   document.getElementById('projectSearch')!.onclick=()=>{this.dialog.showModal();document.getElementById('projectSearchQuery')!.focus();};
   this.dialog.addEventListener('cancel',e=>{if(this.applying)e.preventDefault();});
-  document.getElementById('closeProjectSearch')!.onclick=()=>{if(!this.applying)this.dialog.close();};
+  const closeBtn=document.getElementById('closeProjectSearch');
+  if(closeBtn)closeBtn.onclick=()=>{if(!this.applying)this.dialog.close();};
+  const headerCloseBtn=document.getElementById('closeProjectSearchHeader');
+  if(headerCloseBtn)headerCloseBtn.onclick=()=>{if(!this.applying)this.dialog.close();};
+  this.dialog.addEventListener('click',e=>{if(e.target===this.dialog&&!this.applying)this.dialog.close();});
+  this.dialog.addEventListener('keydown',e=>{if(e.key==='Escape'&&!this.applying){e.stopPropagation();this.dialog.close();}});
   for(const id of ['projectSearchQuery','projectSearchReplacement','projectSearchRegex','projectSearchCase','projectSearchSupport'])document.getElementById(id)!.addEventListener('input',()=>{this.generation++;this.preview=undefined;this.selected.clear();this.update();this.status.textContent='Search again to refresh the preview.';});
   document.getElementById('projectSearchForm')!.onsubmit=e=>{e.preventDefault();void this.search();};
   document.getElementById('selectSearchAll')!.onclick=()=>{this.selected=new Set(this.preview?.matches.map(m=>m.id));this.render();};document.getElementById('selectSearchNone')!.onclick=()=>{this.selected.clear();this.render();};
