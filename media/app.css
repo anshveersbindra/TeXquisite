@@ -947,18 +947,18 @@ body[data-preview-mode=lecture] #previewMode {
   min-height: 0;
   display: grid;
   grid-template-areas: "source divider preview";
-  grid-template-columns: minmax(0, 1fr) 8px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 #workspace[data-panel-layout="source-top"] {
   grid-template-areas: "source" "divider" "preview";
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) 8px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 1px minmax(0, 1fr);
 }
 #workspace[data-panel-layout="output-top"] {
   grid-template-areas: "preview" "divider" "source";
   grid-template-columns: 1fr;
-  grid-template-rows: minmax(0, 1fr) 8px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 1px minmax(0, 1fr);
 }
 #sourcePane {
   grid-area: source;
@@ -981,45 +981,42 @@ body[data-preview-mode=lecture] #previewMode {
   background: var(--bg-viewport);
 }
 
-/* Divider */
+/* Hairline Precision Divider */
 #panelDivider {
   grid-area: divider;
   position: relative;
-  background: var(--divider);
+  background: var(--border-pane);
   cursor: col-resize;
   touch-action: none;
-  outline-offset: -2px;
-  z-index: 4;
-  transition: background 0.15s ease;
+  z-index: 10;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
-#panelDivider::after {
+#panelDivider::before {
   content: "";
   position: absolute;
-  top: calc(50% - 18px);
-  left: 2.5px;
-  width: 3px;
-  height: 36px;
-  background: var(--text-pane-label);
-  opacity: 0.45;
-  border-radius: 4px;
-  transition: opacity 0.15s ease, height 0.15s ease;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  cursor: col-resize;
+  z-index: 1;
+}
+#panelDivider::after {
+  display: none;
 }
 #panelDivider:hover, #panelDivider:focus-visible, .resizing-panels #panelDivider {
-  background: var(--divider-hover);
-  outline: 2px solid var(--divider-active);
-}
-#panelDivider:hover::after, .resizing-panels #panelDivider::after {
-  opacity: 0.85;
-  height: 48px;
+  background: var(--brand-primary);
+  box-shadow: 0 0 8px var(--brand-primary-subtle);
 }
 #workspace:not([data-panel-layout="side-by-side"]) #panelDivider {
   cursor: row-resize;
 }
-#workspace:not([data-panel-layout="side-by-side"]) #panelDivider::after {
-  top: 2.5px;
-  left: calc(50% - 18px);
-  width: 36px;
-  height: 3px;
+#workspace:not([data-panel-layout="side-by-side"]) #panelDivider::before {
+  top: -4px;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  cursor: row-resize;
 }
 .resizing-panels, .resizing-panels * {
   user-select: none !important;
@@ -1330,15 +1327,21 @@ body[data-preview-mode=lecture] #previewMode {
   background-color: var(--cm-selection) !important;
 }
 footer#rootLabel {
-  font-size: 9.5px;
-  padding: 3px 10px;
-  min-height: 18px;
+  font-size: 10.5px;
+  font-weight: 500;
+  padding: 0 12px;
+  height: 22px;
+  min-height: 22px;
   color: var(--text-pane-label);
   border-top: 1px solid var(--border-pane);
   background: var(--bg-pane);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
 }
 
 /* Docked Overleaf/IDE-Style Find & Replace Panel */
@@ -1629,8 +1632,8 @@ footer#rootLabel {
 #pages canvas {
   display: block;
   margin: 0 auto;
-  box-shadow: 0 6px 28px -3px rgba(0, 0, 0, 0.16), 0 2px 8px -1px rgba(0, 0, 0, 0.08);
-  border-radius: 3px;
+  box-shadow: 0 8px 30px -4px rgba(0, 0, 0, 0.15), 0 2px 8px -2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
   background: #ffffff;
   cursor: crosshair;
 }
@@ -1639,16 +1642,28 @@ footer#rootLabel {
   overflow-anchor: none;
 }
 #pages.continuous canvas {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+  box-shadow: none;
   cursor: default;
 }
 #pages.continuous .flow-page {
   position: relative;
   background: #ffffff;
   overflow: hidden;
-  margin-bottom: 20px;
-  box-shadow: 0 6px 28px -4px rgba(0, 0, 0, 0.16), 0 2px 8px -2px rgba(0, 0, 0, 0.08);
-  border-radius: 3px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 32px -4px rgba(0, 0, 0, 0.15), 0 2px 8px -2px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(0, 0, 0, 0.04);
+  border-radius: 4px;
+}
+[data-theme="dark"] #pages canvas,
+[data-theme="midnight"] #pages canvas,
+[data-theme="nord"] #pages canvas,
+[data-theme="monokai"] #pages canvas,
+[data-theme="overleaf-dark"] #pages canvas,
+[data-theme="dark"] #pages.continuous .flow-page,
+[data-theme="midnight"] #pages.continuous .flow-page,
+[data-theme="nord"] #pages.continuous .flow-page,
+[data-theme="monokai"] #pages.continuous .flow-page,
+[data-theme="overleaf-dark"] #pages.continuous .flow-page {
+  box-shadow: 0 16px 48px -6px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
   filter: invert(0.92) hue-rotate(180deg) contrast(1.05);
@@ -1945,84 +1960,126 @@ html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
   font-size: 11.5px;
 }
 
-/* Empty Screen Minimalist Graphic */
+/* Empty State (Preview Pane) */
 #empty {
-  margin: 12vh auto 0;
+  margin: 16vh auto 0;
   max-width: 360px;
   text-align: center;
-  padding: 20px;
+  padding: 24px;
+  color: var(--text-pane-label);
+  user-select: none;
 }
 .empty-doc-art {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 14px;
-  color: var(--text-muted);
-  opacity: 0.45;
+  margin-bottom: 18px;
+  color: var(--brand-primary);
+  opacity: 0.75;
+  filter: drop-shadow(0 4px 16px var(--brand-primary-subtle));
 }
 #empty h2 {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--text-app);
-  margin: 0 0 6px;
-  letter-spacing: -0.01em;
+  margin: 0 0 8px;
 }
 #empty p {
-  font-size: 12px;
-  color: var(--text-muted);
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-pane-label);
+  opacity: 0.85;
   margin: 0;
 }
+#empty strong {
+  color: var(--text-app);
+  font-weight: 600;
+}
 
-/* Empty & Welcome Screens */
-#empty {
-  margin: 12vh auto 0;
-  max-width: 320px;
-  color: var(--text-pane-label);
-  line-height: 1.7;
-}
-.paper-icon {
-  display: inline-block;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-pane);
-  border-radius: 8px;
-  padding: 16px 28px;
-  font: 36px Georgia, serif;
-  color: var(--brand-primary);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
+/* Welcome Card (Editor Pane) */
 #welcome {
   position: absolute;
-  left: 12%;
-  right: 12%;
-  top: 20%;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  max-width: 500px;
   background: var(--bg-surface);
   border: 1px solid var(--border-pane);
-  border-radius: 10px;
-  padding: 34px 40px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.08);
+  border-radius: 16px;
+  padding: 38px 44px;
+  box-shadow: 0 20px 60px -10px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.05);
   text-align: left;
 }
 #welcome[hidden] { display: none; }
 #welcome h1 {
-  font: 28px/1.25 Georgia, serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.22;
   color: var(--text-app);
   margin-top: 0;
-  letter-spacing: -0.02em;
+  margin-bottom: 12px;
+  letter-spacing: -0.03em;
 }
 #welcome p {
-  line-height: 1.7;
+  font-size: 13.5px;
+  line-height: 1.6;
   color: var(--text-pane-label);
-  max-width: 460px;
+  margin: 0 0 22px;
+  max-width: 440px;
 }
 #welcome .hint {
   font-size: 11px;
-  margin-top: 24px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--text-pane-label);
+  opacity: 0.65;
+  margin-top: 26px;
+  margin-bottom: 0;
 }
 .welcome-actions {
   display: flex;
-  gap: 8px;
-  margin-top: 18px;
+  align-items: center;
+  gap: 10px;
+}
+.welcome-actions button {
+  height: 34px;
+  padding: 0 16px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 7px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--text-app);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.14s ease;
+}
+.welcome-actions button:hover {
+  background: var(--btn-hover);
+  border-color: var(--border-pane);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+.welcome-actions button:active {
+  transform: translateY(0);
+}
+.welcome-actions button.primary {
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: 1px solid #047857;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.welcome-actions button.primary:hover {
+  background: linear-gradient(180deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.45);
 }
 
 /* ========================================================================= */
@@ -2050,16 +2107,27 @@ html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
 }
 
 #sidebarDivider {
-  width: 5px;
+  width: 1px;
   cursor: col-resize;
-  background: var(--divider-bg);
+  background: var(--border-pane);
   flex-shrink: 0;
-  transition: background 0.12s ease;
-  z-index: 10;
   position: relative;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  z-index: 10;
+}
+#sidebarDivider::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  cursor: col-resize;
+  z-index: 1;
 }
 #sidebarDivider:hover, #sidebarDivider.dragging {
-  background: var(--divider-active);
+  background: var(--brand-primary);
+  box-shadow: 0 0 8px var(--brand-primary-subtle);
 }
 #projectSidebar[hidden] + #sidebarDivider {
   display: none;
@@ -2314,16 +2382,27 @@ html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
   background: var(--btn-hover);
 }
 .panel-v-divider {
-  height: 5px;
+  height: 1px;
   cursor: row-resize;
-  background: var(--divider-bg);
+  background: var(--border-pane);
   flex-shrink: 0;
-  transition: background 0.12s ease;
+  position: relative;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
   z-index: 5;
-  border-top: 1px solid var(--border-pane);
+}
+.panel-v-divider::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  bottom: -4px;
+  cursor: row-resize;
+  z-index: 1;
 }
 .panel-v-divider:hover, .panel-v-divider.dragging {
-  background: var(--divider-active);
+  background: var(--brand-primary);
+  box-shadow: 0 0 8px var(--brand-primary-subtle);
 }
 
 summary.drag-hover, .tree-item.drag-hover {
