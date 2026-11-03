@@ -4,12 +4,13 @@
 <title>TeXquisite 0.124.0 — continuous scroll</title><link rel="icon" type="image/svg+xml" href="texquisite-emblem.svg"><link rel="stylesheet" href="app.css"></head>
 <body>
 <header>
-  <div class="brand"><img src="texquisite-logo.png" alt="TeXquisite" width="84" height="30"></div>
+  <div class="brand"><img src="texquisite-logo.png" alt="TeXquisite" width="76" height="26"></div>
   <div class="actions">
-    <!-- Group: File & Workspace -->
+    <!-- Group: File & Workspace (Left Zone) -->
     <div class="toolbar-group">
       <button id="toggleProject" class="icon-button toolbar-icon-btn" aria-expanded="false" title="Project Files (⌘⇧P)" data-tooltip="Project Files (⌘⇧P)"></button>
       <button id="openFolderHeader" class="icon-button toolbar-icon-btn" title="Open Project Folder (⌘⇧O)" data-tooltip="Open Folder (⌘⇧O)"></button>
+      <div class="toolbar-divider"></div>
       <button id="new" class="icon-button toolbar-icon-btn" title="New Document (⌘N)" data-tooltip="New Document (⌘N)"></button>
       <button id="open" class="icon-button toolbar-icon-btn" title="Open Document (⌘O)" data-tooltip="Open Document (⌘O)"></button>
       <button id="save" class="icon-button toolbar-icon-btn" title="Save Document (⌘S)" data-tooltip="Save (⌘S)"></button>
@@ -17,18 +18,14 @@
       <button id="saveCopy" class="icon-button toolbar-icon-btn" title="Save a Copy" data-tooltip="Save a Copy"></button>
     </div>
 
-    <div class="toolbar-divider"></div>
-
-    <!-- Group: Recompile & Live Preview (Hero Actions) -->
+    <!-- Group: Recompile & Live Preview (Center Zone / Hero Actions) -->
     <div class="toolbar-group compile-group">
       <button id="build" class="recompile-btn" title="Recompile Document (⌘B)" data-tooltip="Recompile (⌘B)">Recompile <kbd>⌘B</kbd></button>
       <button id="live" class="live-btn" title="Live Preview: automatically save and rebuild while typing" data-tooltip="Live Preview">Live</button>
       <button id="cancel" class="icon-button toolbar-icon-btn" title="Cancel Current Compilation" data-tooltip="Cancel Compilation"></button>
     </div>
 
-    <div class="toolbar-divider"></div>
-
-    <!-- Group: Layout & Appearance -->
+    <!-- Group: Layout, Diagnostics & Settings (Right Zone) -->
     <div class="toolbar-group">
       <select id="panelLayout" aria-label="Panel layout" title="Panel Layout" data-tooltip="Panel Layout">
         <option value="side-by-side">Side by side</option>
@@ -36,17 +33,12 @@
         <option value="source-top">Source above output</option>
       </select>
       <button id="toggleTheme" class="icon-button toolbar-icon-btn" title="Switch Theme" data-tooltip="Switch Theme"></button>
-    </div>
-
-    <div class="toolbar-divider"></div>
-
-    <!-- Group: Diagnostics & Settings -->
-    <div class="toolbar-group">
-      <button id="toggleStatus" class="icon-button toolbar-icon-btn" aria-pressed="true" title="Toggle Status Bar" data-tooltip="Status Bar"></button>
+      <div class="toolbar-divider"></div>
       <button id="wordCountBtn" class="icon-button toolbar-icon-btn" title="Word Count &amp; Statistics (TeXcount)" data-tooltip="Word Count"></button>
       <button id="toggleProblems" class="icon-button toolbar-icon-btn" title="Project Problems" data-tooltip="Problems"></button>
       <button id="toggleLog" class="icon-button toolbar-icon-btn" title="Build Log: View compiler transcript" data-tooltip="Build Log"></button>
       <button id="settings" class="icon-button toolbar-icon-btn" title="Preferences (⌘,)" data-tooltip="Preferences (⌘,)"></button>
+      <button id="toggleStatus" class="icon-button toolbar-icon-btn" aria-pressed="true" title="Toggle Status Bar" data-tooltip="Status Bar"></button>
     </div>
   </div>
 </header>
@@ -176,9 +168,15 @@
         <div><button id="previous">Previous version</button><button id="export">Export PDF…</button></div>
       </div>
       <div class="pdf-toolbar">
-        <button id="prevPage" aria-label="Previous page">←</button>
-        <span id="pageLabel">No document</span>
-        <button id="nextPage" aria-label="Next page">→</button>
+        <div class="pdf-stepper-capsule">
+          <button id="prevPage" class="icon-button stepper-btn" aria-label="Previous page" title="Previous page">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+          </button>
+          <span id="pageLabel">No document</span>
+          <button id="nextPage" class="icon-button stepper-btn" aria-label="Next page" title="Next page">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+          </button>
+        </div>
         <select id="zoom" aria-label="Zoom">
           <option value="fit-width">Fit width</option>
           <option value="0.8">80%</option>
@@ -200,7 +198,7 @@
         <button id="locate" title="Show the source cursor in the PDF (Cmd+Enter)">Show in PDF</button>
         <button id="follow" aria-pressed="false">Follow typing: off</button>
       </div>
-      <div id="mathTools" class="navigation-toolbar" aria-label="Math editing tools">
+      <div id="mathTools" hidden class="navigation-toolbar" aria-label="Math editing tools">
         <span>Math</span>
         <button data-math="frac" title="Insert a fraction (Alt+F)">a/b</button>
         <button data-math="sqrt" title="Insert a square root (Alt+R)">√x</button>
