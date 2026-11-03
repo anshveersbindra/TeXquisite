@@ -141,6 +141,102 @@ const lightSyntaxHighlighting = syntaxHighlighting(HighlightStyle.define([
   { tag: t.invalid, color: '#cf222e' }
 ]));
 
+// Monokai Theme (Sublime / Vibrant)
+const monokaiEditorTheme = EditorView.theme({
+  '&': { backgroundColor: '#272822', color: '#f8f8f2' },
+  '.cm-content': { caretColor: '#f8f8f0' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#f8f8f0' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection, ::selection': { backgroundColor: '#49483e !important' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(230, 219, 116, 0.3) !important', outline: '1px solid rgba(230, 219, 116, 0.5)' },
+  '.cm-panels': { backgroundColor: '#1e1f1c', color: '#f8f8f2' },
+  '.cm-gutters': { backgroundColor: '#272822', color: '#75715e', borderRight: '1px solid #383a34' },
+  '.cm-activeLine': { backgroundColor: '#3e3d32' },
+  '.cm-activeLineGutter': { backgroundColor: '#3e3d32', color: '#f8f8f2' }
+}, { dark: true });
+
+const monokaiSyntaxHighlighting = syntaxHighlighting(HighlightStyle.define([
+  { tag: t.keyword, color: '#f92672', fontWeight: 'bold' },
+  { tag: [t.name, t.deleted, t.character, t.macroName], color: '#66d9ef' },
+  { tag: [t.function(t.variableName), t.labelName], color: '#a6e22e' },
+  { tag: [t.color, t.constant(t.name), t.standard(t.name)], color: '#ae81ff' },
+  { tag: [t.definition(t.name), t.separator], color: '#fd971f' },
+  { tag: [t.typeName, t.className, t.number, t.changed, t.annotation, t.modifier, t.self, t.namespace], color: '#ae81ff' },
+  { tag: [t.operator, t.operatorKeyword, t.url, t.escape, t.regexp, t.link, t.special(t.string)], color: '#f92672' },
+  { tag: [t.meta, t.comment], color: '#75715e', fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: 'bold', color: '#f8f8f2' },
+  { tag: t.emphasis, fontStyle: 'italic', color: '#f8f8f2' },
+  { tag: t.link, color: '#66d9ef', textDecoration: 'underline' },
+  { tag: t.heading, fontWeight: 'bold', color: '#a6e22e' },
+  { tag: [t.atom, t.bool, t.special(t.variableName)], color: '#ae81ff' },
+  { tag: t.bracket, color: '#f8f8f2' },
+  { tag: [t.processingInstruction, t.string, t.inserted], color: '#e6db74' },
+  { tag: t.invalid, color: '#f92672' }
+]));
+
+// Overleaf Classic Theme (Crisp Light Studio with Overleaf Green accents)
+const overleafEditorTheme = EditorView.theme({
+  '&': { backgroundColor: '#ffffff', color: '#1a1f2c' },
+  '.cm-content': { caretColor: '#138a36' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#138a36' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection, ::selection': { backgroundColor: '#bfe3cc !important' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(25, 135, 84, 0.2) !important', outline: '1px solid rgba(25, 135, 84, 0.4)' },
+  '.cm-panels': { backgroundColor: '#f4f5f7', color: '#1a1f2c' },
+  '.cm-gutters': { backgroundColor: '#f8f9fa', color: '#94a3b8', borderRight: '1px solid #e2e8f0' },
+  '.cm-activeLine': { backgroundColor: '#f0fdf4' },
+  '.cm-activeLineGutter': { backgroundColor: '#dcfce7', color: '#15803d' }
+}, { dark: false });
+
+const overleafSyntaxHighlighting = syntaxHighlighting(HighlightStyle.define([
+  { tag: t.keyword, color: '#008000', fontWeight: 'bold' },
+  { tag: [t.name, t.deleted, t.character, t.macroName], color: '#0550ae' },
+  { tag: [t.function(t.variableName), t.labelName], color: '#b45309', fontWeight: '600' },
+  { tag: [t.color, t.constant(t.name), t.standard(t.name)], color: '#0969da' },
+  { tag: [t.definition(t.name), t.separator], color: '#d97706' },
+  { tag: [t.typeName, t.className, t.number, t.changed, t.annotation, t.modifier, t.self, t.namespace], color: '#138a36' },
+  { tag: [t.operator, t.operatorKeyword, t.url, t.escape, t.regexp, t.link, t.special(t.string)], color: '#0366d6' },
+  { tag: [t.meta, t.comment], color: '#52795d', fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: 'bold', color: '#1a1f2c' },
+  { tag: t.emphasis, fontStyle: 'italic', color: '#1a1f2c' },
+  { tag: t.link, color: '#138a36', textDecoration: 'underline' },
+  { tag: t.heading, fontWeight: 'bold', color: '#008000' },
+  { tag: [t.atom, t.bool, t.special(t.variableName)], color: '#c2410c' },
+  { tag: t.bracket, color: '#334155' },
+  { tag: [t.processingInstruction, t.string, t.inserted], color: '#b91c1c' },
+  { tag: t.invalid, color: '#dc2626' }
+]));
+
+// Overleaf Dark Theme (Modern Emerald Slate)
+const overleafDarkEditorTheme = EditorView.theme({
+  '&': { backgroundColor: '#1e2429', color: '#e2e8f0' },
+  '.cm-content': { caretColor: '#38a169' },
+  '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#38a169' },
+  '&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection, ::selection': { backgroundColor: '#284638 !important' },
+  '.cm-selectionMatch': { backgroundColor: 'rgba(56, 161, 105, 0.25) !important', outline: '1px solid rgba(56, 161, 105, 0.45)' },
+  '.cm-panels': { backgroundColor: '#181d21', color: '#e2e8f0' },
+  '.cm-gutters': { backgroundColor: '#1b2025', color: '#64748b', borderRight: '1px solid #2b333a' },
+  '.cm-activeLine': { backgroundColor: '#252c34' },
+  '.cm-activeLineGutter': { backgroundColor: '#213329', color: '#48bb78' }
+}, { dark: true });
+
+const overleafDarkSyntaxHighlighting = syntaxHighlighting(HighlightStyle.define([
+  { tag: t.keyword, color: '#48bb78', fontWeight: 'bold' },
+  { tag: [t.name, t.deleted, t.character, t.macroName], color: '#63b3ed' },
+  { tag: [t.function(t.variableName), t.labelName], color: '#f6ad55', fontWeight: '600' },
+  { tag: [t.color, t.constant(t.name), t.standard(t.name)], color: '#68d391' },
+  { tag: [t.definition(t.name), t.separator], color: '#ed8936' },
+  { tag: [t.typeName, t.className, t.number, t.changed, t.annotation, t.modifier, t.self, t.namespace], color: '#4fd1c5' },
+  { tag: [t.operator, t.operatorKeyword, t.url, t.escape, t.regexp, t.link, t.special(t.string)], color: '#63b3ed' },
+  { tag: [t.meta, t.comment], color: '#718096', fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: 'bold', color: '#f7fafc' },
+  { tag: t.emphasis, fontStyle: 'italic', color: '#f7fafc' },
+  { tag: t.link, color: '#48bb78', textDecoration: 'underline' },
+  { tag: t.heading, fontWeight: 'bold', color: '#68d391' },
+  { tag: [t.atom, t.bool, t.special(t.variableName)], color: '#fc8181' },
+  { tag: t.bracket, color: '#cbd5e0' },
+  { tag: [t.processingInstruction, t.string, t.inserted], color: '#fbd38d' },
+  { tag: t.invalid, color: '#e53e3e' }
+]));
+
 interface BibState {
   inEntry: boolean;
   inParams: boolean;
@@ -251,25 +347,28 @@ const bibtexMode = {
 
 const bibtexLanguage = StreamLanguage.define(bibtexMode as any);
 
-let currentThemeSetting: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm' = 'auto';
+let currentThemeSetting: 'auto'|'dark'|'midnight'|'nord'|'monokai'|'overleaf'|'overleaf-dark'|'light'|'warm' = 'auto';
 let currentPdfInvert = false;
 let systemIsDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
 
 function computeIsDark(): boolean {
-  if (['dark', 'midnight', 'nord'].includes(currentThemeSetting)) return true;
-  if (['light', 'warm'].includes(currentThemeSetting)) return false;
+  if (['dark', 'midnight', 'nord', 'monokai', 'overleaf-dark'].includes(currentThemeSetting)) return true;
+  if (['light', 'warm', 'overleaf'].includes(currentThemeSetting)) return false;
   return systemIsDark;
 }
 
 function getThemeExtensions(theme: string, isDark: boolean) {
   if (theme === 'midnight') return [midnightEditorTheme, darkSyntaxHighlighting];
   if (theme === 'nord') return [nordEditorTheme, darkSyntaxHighlighting];
+  if (theme === 'monokai') return [monokaiEditorTheme, monokaiSyntaxHighlighting];
+  if (theme === 'overleaf') return [overleafEditorTheme, overleafSyntaxHighlighting];
+  if (theme === 'overleaf-dark') return [overleafDarkEditorTheme, overleafDarkSyntaxHighlighting];
   if (theme === 'warm') return [warmEditorTheme, lightSyntaxHighlighting];
   if (theme === 'dark' || (theme === 'auto' && isDark)) return [darkEditorTheme, darkSyntaxHighlighting];
   return [lightEditorTheme, lightSyntaxHighlighting];
 }
 
-function applyTheme(theme?: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm', pdfInvert?: boolean) {
+function applyTheme(theme?: 'auto'|'dark'|'midnight'|'nord'|'monokai'|'overleaf'|'overleaf-dark'|'light'|'warm', pdfInvert?: boolean) {
   if (theme !== undefined) currentThemeSetting = theme;
   if (pdfInvert !== undefined) currentPdfInvert = pdfInvert;
   const isDark = computeIsDark();
@@ -287,6 +386,9 @@ function applyTheme(theme?: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm', pdfI
       dark: 'Dark',
       midnight: 'Midnight',
       nord: 'Nord',
+      monokai: 'Monokai',
+      overleaf: 'Overleaf',
+      'overleaf-dark': 'Overleaf Dark',
       light: 'Light',
       warm: 'Warm'
     };
@@ -543,6 +645,24 @@ function renderProblems(){
  const summary=`${errors} error${errors===1?'':'s'} · ${warnings} warning${warnings===1?'':'s'}`+(checking?` · ${checking} checking`:'');
  el('problemSummary').textContent=summary;
  const toggle=el<HTMLButtonElement>('toggleProblems');toggle.title='Project problems: '+summary;toggle.setAttribute('aria-label',toggle.title);toggle.dataset.count=issues.length?String(issues.length):'';toggle.classList.toggle('has-problems',!!issues.length);
+ const errBadge = document.getElementById('pdfErrorBadge');
+ const warnBadge = document.getElementById('pdfWarningBadge');
+ const succBadge = document.getElementById('pdfSuccessBadge');
+ const errCount = document.getElementById('pdfErrorCount');
+ const warnCount = document.getElementById('pdfWarningCount');
+ if (errBadge && errCount) {
+   errCount.textContent = String(errors);
+   errBadge.hidden = errors === 0;
+   errBadge.title = `${errors} LaTeX error${errors === 1 ? '' : 's'} — click to view in Problems`;
+ }
+ if (warnBadge && warnCount) {
+   warnCount.textContent = String(warnings);
+   warnBadge.hidden = warnings === 0;
+   warnBadge.title = `${warnings} LaTeX warning${warnings === 1 ? '' : 's'} — click to view in Problems`;
+ }
+ if (succBadge) {
+   succBadge.hidden = errors > 0 || warnings > 0;
+ }
  const stale=issues.some(i=>i.editId!==latestEdit?.id);el('problemState').textContent=stale?'Source changed · waiting for preview':issues.some(i=>i.id.startsWith('local-recovery-'))?'Current local preview':issues.length?'Latest full build':'No problems reported by the latest full build';
  const list=el('problemList');list.replaceChildren();const filter=el<HTMLSelectElement>('problemFilter').value;
  for(const issue of issues.filter(i=>filter==='all'||(i.severity??'error')===filter)){
@@ -559,6 +679,28 @@ function renderProblems(){
 el('problemFilter').onchange=renderProblems;
 el('toggleProblems').onclick=()=>{const panel=el<HTMLDetailsElement>('problems');panel.open=!panel.open;el('toggleProblems').setAttribute('aria-expanded',String(panel.open));};
 el('problems').ontoggle=()=>el('toggleProblems').setAttribute('aria-expanded',String(el<HTMLDetailsElement>('problems').open));
+const pdfErrBtn = document.getElementById('pdfErrorBadge');
+if (pdfErrBtn) pdfErrBtn.onclick = () => {
+  const panel = el<HTMLDetailsElement>('problems');
+  panel.open = true;
+  el<HTMLSelectElement>('problemFilter').value = 'error';
+  renderProblems();
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+const pdfWarnBtn = document.getElementById('pdfWarningBadge');
+if (pdfWarnBtn) pdfWarnBtn.onclick = () => {
+  const panel = el<HTMLDetailsElement>('problems');
+  panel.open = true;
+  el<HTMLSelectElement>('problemFilter').value = 'warning';
+  renderProblems();
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+const pdfSuccBtn = document.getElementById('pdfSuccessBadge');
+if (pdfSuccBtn) pdfSuccBtn.onclick = () => {
+  const panel = el<HTMLDetailsElement>('problems');
+  panel.open = !panel.open;
+  if (panel.open) renderProblems();
+};
 let markerGeneration=0,markerKey='';
 function syncErrorMarker(){
   const generation=++markerGeneration,editor=view,file=active,issue=compileIssue;
@@ -821,7 +963,7 @@ function createState(text:string){
  const textHit=(event:PointerEvent,editor:EditorView)=>{const line=event.target instanceof Element?event.target.closest('.cm-line'):undefined;if(!line||!editor.contentDOM.contains(line))return false;const range=document.createRange();range.selectNodeContents(line);return [...range.getClientRects()].some(r=>r.width>0&&event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom);};
  const isBib=active.endsWith('.bib');
  const langExt=isBib?bibtexLanguage:StreamLanguage.define(stex);
- return EditorState.create({doc:text,extensions:[basicSetup,latexKeymap,search({top:true}),keymap.of(searchKeymap),lintGutter(),langExt,texCompletion(()=>model.autoClose!==false),autocompletion({override:[latexCompletionSource],defaultKeymap:true,activateOnTyping:true,maxRenderedOptions:50}),EditorView.lineWrapping,themeCompartment.of(getThemeExtensions(currentThemeSetting,computeIsDark())),
+ return EditorState.create({doc:text,extensions:[basicSetup,latexKeymap,search({top:false}),keymap.of(searchKeymap),lintGutter(),langExt,texCompletion(()=>model.autoClose!==false),autocompletion({override:[latexCompletionSource],defaultKeymap:true,activateOnTyping:true,maxRenderedOptions:50}),EditorView.lineWrapping,themeCompartment.of(getThemeExtensions(currentThemeSetting,computeIsDark())),
   EditorView.domEventHandlers({beforeinput(event,editor){
     markInput();
     const input=event as InputEvent;
@@ -1079,6 +1221,10 @@ document.querySelectorAll<HTMLButtonElement>('.settings-tabs .tab-btn').forEach(
 });
 el('closeSettingsX').onclick = () => el<HTMLDialogElement>('settingsDialog').close();
 el('cancelSettings').onclick = () => el<HTMLDialogElement>('settingsDialog').close();
+const settingsDialogEl = el<HTMLDialogElement>('settingsDialog');
+settingsDialogEl.onclick = (e) => {
+  if (e.target === settingsDialogEl) settingsDialogEl.close();
+};
 
 el<HTMLSelectElement>('prefFontSize').onchange = () => {
   applyFontSize(el<HTMLSelectElement>('prefFontSize').value);
@@ -1096,14 +1242,17 @@ el<HTMLInputElement>('prefPdfInvert').onchange = () => void command(async () => 
 el<HTMLInputElement>('prefAutoClose').onchange = () => {
   model.autoClose = el<HTMLInputElement>('prefAutoClose').checked;
   const btn = el('autoClose');
-  if (btn) btn.textContent = model.autoClose ? 'Match pairs: on' : 'Match pairs: off';
+  if (btn) {
+    btn.setAttribute('aria-pressed', String(model.autoClose));
+    btn.setAttribute('title', model.autoClose ? 'Automatically close TeX pairs: On' : 'Automatically close TeX pairs: Off');
+  }
 };
 el<HTMLInputElement>('prefFollowPreview').onchange = () => {
   model.followPreview = el<HTMLInputElement>('prefFollowPreview').checked;
   const btn = el('follow');
   if (btn) {
     btn.setAttribute('aria-pressed', String(model.followPreview));
-    btn.textContent = model.followPreview ? 'Follow typing: on' : 'Follow typing: off';
+    btn.setAttribute('title', model.followPreview ? 'Follow typing in the preview: On' : 'Follow typing in the preview: Off');
   }
 };
 el<HTMLInputElement>('prefPreviewEditing').onchange = () => void command(async () => {
@@ -1111,7 +1260,7 @@ el<HTMLInputElement>('prefPreviewEditing').onchange = () => void command(async (
   const btn = el('editPreview');
   if (btn) {
     btn.setAttribute('aria-pressed', String(model.previewEditing));
-    btn.textContent = model.previewEditing ? 'Edit preview: on' : 'Edit preview: off';
+    btn.setAttribute('title', model.previewEditing ? 'Edit preview: On' : 'Edit preview: Off');
   }
 });
 const settingsBackupNow = el('settingsBackupNow');
@@ -1175,12 +1324,21 @@ el('applySettings').onclick = event => {
       backups: backupsVal
     });
     applyTheme(themeVal, invertVal);
-    el('autoClose').setAttribute('aria-pressed', String(autoCloseVal));
-    el('autoClose').textContent = 'Match pairs: ' + (autoCloseVal ? 'on' : 'off');
-    el('follow').setAttribute('aria-pressed', String(followPreviewVal));
-    el('follow').textContent = 'Follow typing: ' + (followPreviewVal ? 'on' : 'off');
-    el('editPreview').setAttribute('aria-pressed', String(previewEditingVal));
-    el('editPreview').textContent = 'Edit preview: ' + (previewEditingVal ? 'on' : 'off');
+    const autoBtn = el('autoClose');
+    if (autoBtn) {
+      autoBtn.setAttribute('aria-pressed', String(autoCloseVal));
+      autoBtn.setAttribute('title', autoCloseVal ? 'Automatically close TeX pairs: On' : 'Automatically close TeX pairs: Off');
+    }
+    const followBtn = el('follow');
+    if (followBtn) {
+      followBtn.setAttribute('aria-pressed', String(followPreviewVal));
+      followBtn.setAttribute('title', followPreviewVal ? 'Follow typing in the preview: On' : 'Follow typing in the preview: Off');
+    }
+    const editBtn = el('editPreview');
+    if (editBtn) {
+      editBtn.setAttribute('aria-pressed', String(previewEditingVal));
+      editBtn.setAttribute('title', previewEditingVal ? 'Edit preview: On' : 'Edit preview: Off');
+    }
     renderToolchain(model.toolchain, true);
     renderTabs();
     el<HTMLDialogElement>('settingsDialog').close();
@@ -1501,7 +1659,7 @@ function stepZoom(direction: 1|-1){
   else nextVal=[...zoomSteps].reverse().find(z=>z<currentVal-0.01)??zoomSteps[0];
   setZoom(nextVal);
 }
-const themesList: Array<'auto'|'dark'|'midnight'|'nord'|'light'|'warm'> = ['auto', 'dark', 'midnight', 'nord', 'light', 'warm'];
+const themesList: Array<'auto'|'dark'|'midnight'|'nord'|'monokai'|'overleaf'|'overleaf-dark'|'light'|'warm'> = ['auto', 'dark', 'midnight', 'nord', 'monokai', 'overleaf', 'overleaf-dark', 'light', 'warm'];
 el('toggleTheme').onclick = () => void command(async () => {
   const currentIndex = themesList.indexOf(currentThemeSetting);
   const next = themesList[(currentIndex + 1) % themesList.length];

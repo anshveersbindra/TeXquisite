@@ -29,7 +29,7 @@ import {probe} from './toolchain';
 import {standaloneTex,previewRootForDocument} from './document-root';
 
 interface Doc {path:string;text:string;diskHash:string;dirty:boolean;eol:string;}
-interface State {theme?:'auto'|'dark'|'midnight'|'nord'|'light'|'warm';pdfInvert?:boolean;projectFolder?:string;previewMode?:'lecture'|'document';documentRoots?:Record<string,string>;texBin?:string;toolchainSeen?:boolean;projectSidebar?:boolean;docs:Doc[];active:string;root:string;engine:string;latexmk:string;onSave:boolean;backups?:boolean;liveVersion?:number;supportFolders?:string[];zoom?:number|'fit-width';statusBar?:boolean;panelLayout?:PanelPreferences;autoClose?:boolean;followPreview?:boolean;previewEditing?:boolean;continuousPreview?:boolean;lastCursor?:{file:string;at:number};}
+interface State {theme?:'auto'|'dark'|'midnight'|'nord'|'monokai'|'overleaf'|'overleaf-dark'|'light'|'warm';pdfInvert?:boolean;projectFolder?:string;previewMode?:'lecture'|'document';documentRoots?:Record<string,string>;texBin?:string;toolchainSeen?:boolean;projectSidebar?:boolean;docs:Doc[];active:string;root:string;engine:string;latexmk:string;onSave:boolean;backups?:boolean;liveVersion?:number;supportFolders?:string[];zoom?:number|'fit-width';statusBar?:boolean;panelLayout?:PanelPreferences;autoClose?:boolean;followPreview?:boolean;previewEditing?:boolean;continuousPreview?:boolean;lastCursor?:{file:string;at:number};}
 const testData=process.env.PERSISTENT_TEX_TEST_DATA;
 // Retain the established profile location across the TeXquisite rename.
 app.setPath('userData',testData?path.resolve(testData):path.join(app.getPath('appData'),'Persistent TeX'));
@@ -368,7 +368,7 @@ async function handle(method:string,args:unknown[]) {
     }
     case 'previewEditing': clearTimeout(fullVerification);localPreview.stop();state.previewEditing=!!args[0];await persist();if(controller)void build(undefined,true).catch(e=>setStatus(String(e)));return state.previewEditing;
     case 'continuous': clearTimeout(fullVerification);state.continuousPreview=!!args[0];if(state.continuousPreview)state.previewEditing=false;localPreview.setContinuous(state.continuousPreview);await persist();if(controller)void build(undefined,true).catch(e=>setStatus(String(e)));return state.continuousPreview;
-    case 'theme': {const choice=args[0] as 'auto'|'dark'|'midnight'|'nord'|'light'|'warm';if(!['auto','dark','midnight','nord','light','warm'].includes(choice))throw new Error('Invalid theme.');state.theme=choice;await persist();updateAppMenu();return state.theme;}
+    case 'theme': {const choice=args[0] as 'auto'|'dark'|'midnight'|'nord'|'monokai'|'overleaf'|'overleaf-dark'|'light'|'warm';if(!['auto','dark','midnight','nord','monokai','overleaf','overleaf-dark','light','warm'].includes(choice))throw new Error('Invalid theme.');state.theme=choice;await persist();updateAppMenu();return state.theme;}
     case 'pdfInvert': state.pdfInvert=!!args[0];await persist();updateAppMenu();return state.pdfInvert;
     case 'togglePdfInvert': state.pdfInvert=state.pdfInvert===false;await persist();updateAppMenu();return state.pdfInvert;
     case 'statusBar': state.statusBar=!!args[0];await persist();return state.statusBar;
@@ -755,8 +755,10 @@ async function handle(method:string,args:unknown[]) {
         const local=immediate&&!state.previewEditing&&state.engine==='pdflatex'&&lmkBase==='latexmk'&&typeof editId==='string'&&localPreview.request(doc.path,text,editId);
         tracePreview({event:'edit-route',editId,route:local?(localPreview.ready?'local-ready':'local-warming'):'full',cursor:state.lastCursor?.at,characters:text.length});
         clearTimeout(fullVerification);
+        const docLength = text.length;
+        const debounceMs = docLength > 30000 ? 700 : (docLength > 10000 ? 500 : 350);
         if(local)scheduleFullVerification(editId!);
-        else if(immediate){if(latestEditId)scheduleFullVerification(latestEditId,350,true);else void build(undefined,true).catch(e=>setStatus(String(e)));}
+        else if(immediate){if(latestEditId)scheduleFullVerification(latestEditId,debounceMs,true);else void build(undefined,true).catch(e=>setStatus(String(e)));}
         // Accept the editor revision immediately. Automatic disk saving remains
         // serialized and errors retain the draft, but does not block preview IPC.
         void saveAllAndBuild(false,immediate).catch(async error=>{await persist();setStatus(String(error));});
@@ -783,7 +785,7 @@ async function handle(method:string,args:unknown[]) {
       if(!['pdflatex','xelatex','lualatex','latex'].includes(String(value.engine))||typeof value.latexmk!=='string'||!value.latexmk.trim())throw new Error('Invalid toolchain settings.');
       const checked=await checkToolchain(typeof value.texBin==='string'?value.texBin:undefined,value.engine!,value.latexmk);
       clearTimeout(fullVerification);localPreview.stop();controller?.cancel();state.engine=value.engine!;state.latexmk=value.latexmk;state.texBin=checked.selected??value.texBin;state.toolchainSeen=true;state.onSave=!!value.onSave;
-      if(value.theme&&['auto','dark','midnight','nord','light','warm'].includes(value.theme))state.theme=value.theme;
+      if(value.theme&&['auto','dark','midnight','nord','monokai','overleaf','overleaf-dark','light','warm'].includes(value.theme))state.theme=value.theme;
       if(typeof value.pdfInvert==='boolean')state.pdfInvert=value.pdfInvert;
       if(typeof value.autoClose==='boolean')state.autoClose=value.autoClose;
       if(typeof value.followPreview==='boolean')state.followPreview=value.followPreview;

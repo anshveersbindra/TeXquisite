@@ -116,7 +116,20 @@
 
     <section class="preview" id="previewPane">
       <div class="pane-title">
-        <span>COMPILED DOCUMENT</span>
+        <div class="pane-title-left">
+          <span>COMPILED DOCUMENT</span>
+          <div id="pdfDiagnosticsGroup" class="pdf-diagnostics-group" title="Compilation diagnostics">
+            <button id="pdfErrorBadge" type="button" class="pdf-badge pdf-badge-error" title="0 errors" hidden>
+              <span class="badge-icon">✕</span><span class="badge-count" id="pdfErrorCount">0</span>
+            </button>
+            <button id="pdfWarningBadge" type="button" class="pdf-badge pdf-badge-warning" title="0 warnings" hidden>
+              <span class="badge-icon">⚠</span><span class="badge-count" id="pdfWarningCount">0</span>
+            </button>
+            <button id="pdfSuccessBadge" type="button" class="pdf-badge pdf-badge-success" title="Preview up to date · No errors">
+              <span class="badge-icon">✓</span>
+            </button>
+          </div>
+        </div>
         <div><button id="previous">Previous version</button><button id="export">Export PDF…</button></div>
       </div>
       <div class="pdf-toolbar">
@@ -228,6 +241,9 @@
             <option value="dark">Dark (Obsidian)</option>
             <option value="midnight">Midnight (OLED Pure Black)</option>
             <option value="nord">Nord (Arctic Navy)</option>
+            <option value="monokai">Monokai (Vibrant Dark)</option>
+            <option value="overleaf">Overleaf (Classic Light)</option>
+            <option value="overleaf-dark">Overleaf Dark</option>
             <option value="light">Light (Studio Clean)</option>
             <option value="warm">Warm (Sepia Paper)</option>
           </select>

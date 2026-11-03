@@ -12,7 +12,7 @@ export interface Preferences {
   statusBar?: boolean;
   zoom?: number|'fit-width';
   panelLayout?: {mode:string};
-  theme?: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm';
+  theme?: 'auto'|'dark'|'midnight'|'nord'|'monokai'|'overleaf'|'overleaf-dark'|'light'|'warm';
   pdfInvert?: boolean;
 }
 
@@ -126,6 +126,9 @@ export function appMenu(state:Preferences, send:(action:string, value?:string)=>
           select('Dark (Obsidian)', 'theme', 'dark', state.theme === 'dark'),
           select('Midnight (OLED Black)', 'theme', 'midnight', state.theme === 'midnight'),
           select('Nord (Arctic Navy)', 'theme', 'nord', state.theme === 'nord'),
+          select('Monokai (Vibrant Dark)', 'theme', 'monokai', state.theme === 'monokai'),
+          select('Overleaf (Classic Light)', 'theme', 'overleaf', state.theme === 'overleaf'),
+          select('Overleaf Dark', 'theme', 'overleaf-dark', state.theme === 'overleaf-dark'),
           select('Light (Studio)', 'theme', 'light', state.theme === 'light'),
           select('Warm (Sepia Paper)', 'theme', 'warm', state.theme === 'warm'),
           { type: 'separator' },
