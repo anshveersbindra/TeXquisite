@@ -1,7 +1,7 @@
 {
   "name": "texquisite",
   "productName": "TeXquisite",
-  "version": "0.122.0",
+  "version": "0.124.0",
   "description": "Standalone LaTeX editor with a persistent compiled preview",
   "author": "TeXquisite contributors",
   "private": true,
@@ -55,13 +55,13 @@
       "THIRD-PARTY-NOTICES.txt"
     ],
     "mac": {
+      "target": ["dmg", "zip"],
       "category": "public.app-category.productivity",
-      "icon": "media/texquisite.icns",
-      "target": [
-        "dir",
-        "dmg",
-        "zip"
-      ]
+      "icon": "media/texquisite-icon.icns",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "notarize": false,
+      "artifactName": "TeXquisite-${version}-macOS-${arch}.${ext}"
     },
     "win": {
       "target": "portable",

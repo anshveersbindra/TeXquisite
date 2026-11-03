@@ -885,7 +885,7 @@ app.whenReady().then(async()=>{
   const isMac=process.platform==='darwin';
   const isDark=state.theme==='dark'||((!state.theme||state.theme==='auto')&&nativeTheme.shouldUseDarkColors);
   window=new BrowserWindow({autoHideMenuBar:!isMac,width:1440,height:940,minWidth:900,minHeight:600,show:!process.env.PERSISTENT_TEX_TEST_HIDDEN,icon:isMac?undefined:themeIconPath(nativeTheme,path.join(__dirname,'../media')),titleBarStyle:isMac?'hiddenInset':'default',trafficLightPosition:isMac?{x:14,y:11}:undefined,title:`TeXquisite ${app.getVersion()} — local paragraph preview`,backgroundColor:isDark?'#121417':'#f5f4f0',webPreferences:{preload:path.join(__dirname,'preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true,backgroundThrottling:false}});
-  if(isMac&&app.dock){try{const emblem=nativeImage.createFromPath(path.join(app.getAppPath(),'media/texquisite.icns'));if(!emblem.isEmpty())app.dock.setIcon(emblem);}catch{}}
+  if(isMac&&app.dock){try{const emblem=nativeImage.createFromPath(path.join(app.getAppPath(),'media/texquisite-icon.icns'));if(!emblem.isEmpty())app.dock.setIcon(emblem);}catch{}}
   if(!isMac)followIconTheme(window,nativeTheme,path.join(__dirname,'../media'));
   nativeTheme.on('updated',()=>{send({type:'systemTheme',shouldUseDarkColors:nativeTheme.shouldUseDarkColors});});
   window.webContents.setWindowOpenHandler(()=>({action:'deny'}));

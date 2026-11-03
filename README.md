@@ -18,6 +18,7 @@
 - **Overleaf-Style Modern UI**:
   - Clean Find & Replace overlay dialog (`Cmd + F`, `Esc` to close).
   - Smart autocomplete for `\usepackage{...}`, `\cite{...}`, math symbols (`\alpha`, `\beta`, `\int`, `\sum`), and environments.
+  - Multiple professional themes: **Dark**, **Midnight (OLED)**, **Nord**, **Warm Sepia**, **Light**, and **Auto** (macOS system match), plus **PDF Color Inversion** for night reading.
   - New `.tex` files automatically initialize with standard A4 paper, geometry, and AMS-math boilerplate.
   - Full project folder sidebar for managing multi-file books, theses, and papers.
 
@@ -26,7 +27,7 @@
 ## Installation on macOS
 
 ### 1. Download & Install
-1. Open the included **`TeXquisite-0.122.0-arm64.dmg`**.
+1. Open the included **`TeXquisite-0.124.0-macOS-arm64.dmg`**.
 2. Drag **`TeXquisite.app`** into your **`Applications`** folder.
 
 > **Note on macOS Gatekeeper**: Because this build is distributed outside the Apple App Store, macOS may show a prompt: *"TeXquisite cannot be opened because the developer cannot be verified"*.
