@@ -621,7 +621,49 @@ kbd {
   letter-spacing: 0.3px;
 }
 
-/* Compact Toolbar Controls */
+/* Compact Toolbar Controls & Floating Tooltips */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-3px);
+  padding: 4px 9px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  color: #f3f4f6;
+  background: rgba(18, 20, 24, 0.94);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.12s ease 0.15s, transform 0.12s ease 0.15s, visibility 0.12s;
+  z-index: 1000;
+}
+[data-tooltip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+}
+.actions > .toolbar-group:last-child [data-tooltip]::before {
+  left: auto;
+  right: 0;
+  transform: translateY(-3px);
+}
+.actions > .toolbar-group:last-child [data-tooltip]:hover::before {
+  transform: translateY(0);
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -629,31 +671,32 @@ kbd {
   width: 28px;
   height: 28px;
   min-width: 28px;
-  padding: 4px;
+  padding: 0;
   flex-shrink: 0;
-  border: 1px solid transparent;
-  background: transparent;
-  border-radius: 5px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  border-radius: 6px;
   color: var(--btn-text);
   cursor: pointer;
-  box-shadow: none;
-  transition: background 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease, transform 0.08s ease;
 }
 .icon-button svg {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 14px;
+  height: 14px;
   stroke: currentColor;
 }
 .icon-button:hover {
   background: var(--btn-hover);
-  border-color: var(--btn-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border-color: var(--border-pane);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06);
 }
 .icon-button:active {
-  transform: scale(0.96);
+  transform: scale(0.95);
 }
-.icon-button[aria-pressed=true] {
+.icon-button[aria-pressed=true],
+.icon-button[aria-expanded=true] {
   background: var(--btn-active-bg);
   border-color: var(--btn-active-border);
   color: var(--btn-active-color);
@@ -1429,8 +1472,8 @@ footer#rootLabel {
 #pages canvas {
   display: block;
   margin: 0 auto;
-  box-shadow: 0 4px 22px -2px rgba(0, 0, 0, 0.14), 0 2px 6px -1px rgba(0, 0, 0, 0.08);
-  border-radius: 2px;
+  box-shadow: 0 6px 28px -3px rgba(0, 0, 0, 0.16), 0 2px 8px -1px rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
   background: #ffffff;
   cursor: crosshair;
 }
@@ -1439,16 +1482,16 @@ footer#rootLabel {
   overflow-anchor: none;
 }
 #pages.continuous canvas {
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
   cursor: default;
 }
 #pages.continuous .flow-page {
   position: relative;
   background: #ffffff;
   overflow: hidden;
-  margin-bottom: 16px;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.06);
-  border-radius: 2px;
+  margin-bottom: 20px;
+  box-shadow: 0 6px 28px -4px rgba(0, 0, 0, 0.16), 0 2px 8px -2px rgba(0, 0, 0, 0.08);
+  border-radius: 3px;
 }
 html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
   filter: invert(0.92) hue-rotate(180deg) contrast(1.05);

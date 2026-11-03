@@ -74,3 +74,13 @@ test('Package: infwarerr informational banner is never extracted as a compiler e
  assert.doesNotMatch(result.message,/Providing info\/warning\/error messages/i);
 });
 
+test('Latexmk rerun advice and target messages are never extracted as compiler error messages',()=>{
+ const text='Latexmk: Errors, so I did not complete making targets\nCollected error summary:\n  pdflatex: Command gave return code 1\nNormally, you will need to correct the file(s) that caused the\n  error, and then rerun latexmk.\n';
+ const result=parseDiagnostic(text,inputs);
+ assert.notEqual(result.message,'error, and then rerun latexmk.');
+ assert.doesNotMatch(result.message,/rerun latexmk/i);
+ assert.doesNotMatch(result.message,/caused the/i);
+ assert.equal(result.message,'LaTeX compilation did not finish. Open the build log for details.');
+});
+
+

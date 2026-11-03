@@ -11,7 +11,7 @@ const paths: Record<string, string> = {
   build: 'M7 3l14 9-14 9z',
   pause: 'M7 4v16M17 4v16',
   live: 'M13 2L4 14h7l-1 8 10-13h-8z',
-  cancel: 'M5 5h14v14H5z',
+  cancel: 'M18 6L6 18M6 6l12 12',
   settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z',
   support: 'M8 13l7-7a4 4 0 0 1 6 6L11 22a6 6 0 0 1-8-8L13 4',
   root: 'M4 3h12l4 4v14H4z M8 15l3 3 6-7',
@@ -57,34 +57,11 @@ export function toolbarButton(id: string, name: string, label: string) {
     button.dataset.icon = name;
     return;
   }
-  const labeledButtons: Record<string, string> = {
-    toggleProject: 'Files',
-    openFolderHeader: 'Folder',
-    new: 'New',
-    open: 'Open',
-    save: 'Save',
-    reload: 'Reload',
-    saveCopy: 'Copy',
-    cancel: 'Cancel',
-    toggleStatus: 'Status',
-    wordCountBtn: 'Words',
-    toggleProblems: 'Problems',
-    toggleLog: 'Log',
-    settings: 'Settings'
-  };
-
-  if (labeledButtons[id]) {
-    button.className = 'toolbar-btn has-label';
-    button.innerHTML = `${svg(name)} <span>${labeledButtons[id]}</span>`;
-    button.dataset.icon = name;
-    return;
-  }
-
   if (button.dataset.icon !== name) {
     button.innerHTML = svg(name);
     button.dataset.icon = name;
   }
-  button.classList.add('icon-button');
+  button.className = 'icon-button toolbar-icon-btn';
 }
 
 const selects: [string, string, string][] = [

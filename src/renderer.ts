@@ -393,10 +393,12 @@ function applyTheme(theme?: 'auto'|'dark'|'midnight'|'nord'|'monokai'|'overleaf'
       light: 'Light',
       warm: 'Warm'
     };
-    themeBtn.classList.remove('icon-button');
-    themeBtn.classList.add('has-label');
-    themeBtn.innerHTML = `${renderSvg('theme', 13)} <span>Theme: ${titles[currentThemeSetting] || 'Auto'}</span>`;
-    themeBtn.setAttribute('title', `Theme: ${titles[currentThemeSetting] || 'Auto'} (Click to switch)`);
+    themeBtn.classList.add('icon-button');
+    themeBtn.classList.remove('has-label');
+    themeBtn.innerHTML = renderSvg('theme', 14);
+    const themeTooltip = `Theme: ${titles[currentThemeSetting] || 'Auto'} (Click to cycle themes)`;
+    themeBtn.setAttribute('title', themeTooltip);
+    themeBtn.setAttribute('data-tooltip', themeTooltip);
     themeBtn.setAttribute('aria-pressed', String(isDark));
   }
   const invertBtn = el('togglePdfInvert');

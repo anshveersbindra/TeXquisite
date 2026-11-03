@@ -8,45 +8,45 @@
   <div class="actions">
     <!-- Group: File & Workspace -->
     <div class="toolbar-group">
-      <button id="toggleProject" class="toolbar-btn" aria-expanded="false" title="Toggle file explorer (Cmd+Shift+P)">Files</button>
-      <button id="openFolderHeader" class="toolbar-btn" title="Open project folder (Cmd+Shift+O)">Open Folder</button>
-      <button id="new" class="toolbar-icon-btn" title="New document (Cmd+N)">New</button>
-      <button id="open" class="toolbar-icon-btn" title="Open document (Cmd+O)">Open</button>
-      <button id="save" class="toolbar-icon-btn" title="Save document (Cmd+S)">Save</button>
-      <button id="reload" class="toolbar-icon-btn" title="Reload from disk">Reload</button>
-      <button id="saveCopy" class="toolbar-icon-btn" title="Save copy of active file">Copy</button>
+      <button id="toggleProject" class="icon-button toolbar-icon-btn" aria-expanded="false" title="Project Files (⌘⇧P)" data-tooltip="Project Files (⌘⇧P)"></button>
+      <button id="openFolderHeader" class="icon-button toolbar-icon-btn" title="Open Project Folder (⌘⇧O)" data-tooltip="Open Folder (⌘⇧O)"></button>
+      <button id="new" class="icon-button toolbar-icon-btn" title="New Document (⌘N)" data-tooltip="New Document (⌘N)"></button>
+      <button id="open" class="icon-button toolbar-icon-btn" title="Open Document (⌘O)" data-tooltip="Open Document (⌘O)"></button>
+      <button id="save" class="icon-button toolbar-icon-btn" title="Save Document (⌘S)" data-tooltip="Save (⌘S)"></button>
+      <button id="reload" class="icon-button toolbar-icon-btn" title="Reload from Disk" data-tooltip="Reload from Disk"></button>
+      <button id="saveCopy" class="icon-button toolbar-icon-btn" title="Save a Copy" data-tooltip="Save a Copy"></button>
     </div>
 
     <div class="toolbar-divider"></div>
 
-    <!-- Group: Recompile & Live Preview (Overleaf-style prominent button) -->
+    <!-- Group: Recompile & Live Preview (Hero Actions) -->
     <div class="toolbar-group compile-group">
-      <button id="build" class="recompile-btn" title="Recompile document (Cmd+B)">Recompile <kbd>⌘B</kbd></button>
-      <button id="live" class="live-btn" title="Live Preview: automatically save and rebuild while typing">Live</button>
-      <button id="cancel" class="toolbar-icon-btn" title="Cancel current compilation">Cancel</button>
+      <button id="build" class="recompile-btn" title="Recompile Document (⌘B)" data-tooltip="Recompile (⌘B)">Recompile <kbd>⌘B</kbd></button>
+      <button id="live" class="live-btn" title="Live Preview: automatically save and rebuild while typing" data-tooltip="Live Preview">Live</button>
+      <button id="cancel" class="icon-button toolbar-icon-btn" title="Cancel Current Compilation" data-tooltip="Cancel Compilation"></button>
     </div>
 
     <div class="toolbar-divider"></div>
 
     <!-- Group: Layout & Appearance -->
     <div class="toolbar-group">
-      <select id="panelLayout" aria-label="Panel layout" title="Arrange source and output panels">
+      <select id="panelLayout" aria-label="Panel layout" title="Panel Layout" data-tooltip="Panel Layout">
         <option value="side-by-side">Side by side</option>
         <option value="output-top">Output above source</option>
         <option value="source-top">Source above output</option>
       </select>
-      <button id="toggleTheme" class="toolbar-btn" title="Appearance: Switch theme">Theme</button>
+      <button id="toggleTheme" class="icon-button toolbar-icon-btn" title="Switch Theme" data-tooltip="Switch Theme"></button>
     </div>
 
     <div class="toolbar-divider"></div>
 
     <!-- Group: Diagnostics & Settings -->
     <div class="toolbar-group">
-      <button id="toggleStatus" class="toolbar-icon-btn" aria-pressed="true" title="Toggle status bar">Status</button>
-      <button id="wordCountBtn" class="toolbar-icon-btn" title="Detailed Word Count &amp; Character Statistics (TeXcount breakdown)">Words</button>
-      <button id="toggleProblems" class="toolbar-icon-btn" title="Project problems">Problems</button>
-      <button id="toggleLog" class="toolbar-icon-btn" title="View build log">Log</button>
-      <button id="settings" class="toolbar-icon-btn" title="Preferences (Cmd+,)">Settings</button>
+      <button id="toggleStatus" class="icon-button toolbar-icon-btn" aria-pressed="true" title="Toggle Status Bar" data-tooltip="Status Bar"></button>
+      <button id="wordCountBtn" class="icon-button toolbar-icon-btn" title="Word Count &amp; Statistics (TeXcount)" data-tooltip="Word Count"></button>
+      <button id="toggleProblems" class="icon-button toolbar-icon-btn" title="Project Problems" data-tooltip="Problems"></button>
+      <button id="toggleLog" class="icon-button toolbar-icon-btn" title="Build Log: View compiler transcript" data-tooltip="Build Log"></button>
+      <button id="settings" class="icon-button toolbar-icon-btn" title="Preferences (⌘,)" data-tooltip="Preferences (⌘,)"></button>
     </div>
   </div>
 </header>
