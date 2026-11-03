@@ -61,3 +61,39 @@ Our experimental results indicate substantial speedup \\footnote{Measured on NVI
   assert.match(formatted, /Footnotes:/);
   assert.match(formatted, /Other:/);
 });
+
+test('parseTeXBreakdown does not swallow text when encountering LaTeX line breaks with spacing like \\\\[0.8em]', () => {
+  const sample = `
+\\documentclass{article}
+\\begin{document}
+First paragraph with some words.\\\\[0.8em]
+{\\small Second paragraph with more words that must not be deleted}\\\\[1.2em]
+Third paragraph here.
+\\[
+  E = mc^2
+\\]
+Fourth paragraph after math formula.
+\\end{document}
+`;
+
+  const breakdown = parseTeXBreakdown(sample);
+  // There should be ~23 words across all paragraphs, not truncated to 0 or 5 words!
+  assert.ok(breakdown.total.words >= 20, `Expected at least 20 words, got ${breakdown.total.words}`);
+  assert.ok(breakdown.mainText.characters > 100, `Expected >100 characters, got ${breakdown.mainText.characters}`);
+});
+
+test('computeWordCount runs successfully and returns authoritative breakdown', async () => {
+  const sample = `
+\\documentclass{article}
+\\begin{document}
+\\section{Test Section}
+Here is a complete paragraph with eight distinct words.
+\\end{document}
+`;
+
+  const result = await computeWordCount(sample);
+  assert.ok(result.total.words >= 9, `Expected >= 9 total words, got ${result.total.words}`);
+  assert.equal(result.headers.words, 2);
+  assert.ok(['texcount', 'internal'].includes(result.source));
+});
+

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
+import path from 'node:path';
 import {
   TeXCountItem,
   TeXCountBreakdown,
@@ -20,47 +20,62 @@ export {
   stripComments,
 };
 
-const execFileAsync = promisify(execFile);
+/**
+ * Runs texcount CLI with input text over stdin and returns text, header, and caption counts.
+ */
+function runTexcountCli(bin: string, input: string, cwd?: string): Promise<{ text: number; headers: number; captions: number }> {
+  return new Promise((resolve, reject) => {
+    const args = ['-template={1}:{2}:{3}:{4}:{5}:{6}:{7}', '-merge', '-inc', '-'];
+    const child = execFile(bin, args, { cwd, timeout: 5000 }, (error, stdout) => {
+      if (error) return reject(error);
+      const parts = stdout.trim().split(':').map(Number);
+      resolve({
+        text: parts[0] || 0,
+        headers: parts[1] || 0,
+        captions: parts[2] || 0,
+      });
+    });
+    if (child.stdin) {
+      child.stdin.write('%TC:envir titlepage [] text\n' + input);
+      child.stdin.end();
+    }
+  });
+}
 
 /**
  * Tries running texcount CLI if available on the system.
- * If successful, blends CLI precision with section breakdown.
+ * If successful, blends CLI precision with component breakdown.
  */
 export async function computeWordCount(text: string, filePath?: string): Promise<TeXCountBreakdown> {
   const fallback = parseTeXBreakdown(text);
+  const cwd = filePath ? path.dirname(filePath) : undefined;
 
   const candidates = ['/Library/TeX/texbin/texcount', 'texcount'];
   for (const bin of candidates) {
     try {
-      let args = ['-brief', '-char', '-sum=1,1,1,0,0,1,1'];
-      let output = '';
-      if (filePath) {
-        const res = await execFileAsync(bin, [...args, filePath], { timeout: 3000 });
-        output = res.stdout;
-      } else {
-        const child = execFile(bin, [...args, '-']);
-        if (child.stdin) {
-          child.stdin.write(text);
-          child.stdin.end();
-        }
-        const { stdout } = await new Promise<{ stdout: string; stderr: string }>((resolve, reject) => {
-          let out = '';
-          let err = '';
-          child.stdout?.on('data', d => { out += d; });
-          child.stderr?.on('data', d => { err += d; });
-          child.on('close', code => {
-            if (code === 0) resolve({ stdout: out, stderr: err });
-            else reject(new Error(`texcount failed with code ${code}`));
-          });
-          child.on('error', reject);
-        });
-        output = stdout;
-      }
+      const citeRegex = /\\(?:cite|citep|citet|citeauthor|citeyear|parencite|textcite|autocite|footcite|supercite|cites)\*?(?:\s*\[[^\]]*\])*\s*\{([^}]+)\}/g;
+      const textWithoutCites = text.replace(citeRegex, ' ');
 
-      if (output) {
+      const [withCites, withoutCites] = await Promise.all([
+        runTexcountCli(bin, text, cwd),
+        runTexcountCli(bin, textWithoutCites, cwd),
+      ]);
+
+      if (withCites && withCites.text > 0) {
+        fallback.mainText.words = withCites.text;
+        fallback.headers.words = withCites.headers;
+        fallback.captions.words = withCites.captions;
+        fallback.mainTextWithoutCitations.words = withoutCites.text;
+        fallback.total.words =
+          fallback.mainText.words +
+          fallback.headers.words +
+          fallback.abstract.words +
+          fallback.captions.words +
+          fallback.footnotes.words +
+          fallback.other.words;
         fallback.source = 'texcount';
+        return fallback;
       }
-      return fallback;
     } catch {
       // CLI not available or failed; continue with high-precision internal parser
     }

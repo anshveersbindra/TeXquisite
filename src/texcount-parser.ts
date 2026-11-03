@@ -23,7 +23,7 @@ export function stripComments(text: string): string {
 }
 
 /**
- * Count Unicode words and non-whitespace characters in a string.
+ * Count Unicode words and total characters in a string.
  */
 export function countWordsAndChars(text: string): TeXCountItem {
   if (!text || !text.trim()) {
@@ -31,11 +31,11 @@ export function countWordsAndChars(text: string): TeXCountItem {
   }
   // Match words: alphanumeric sequences, allowing intra-word apostrophes and hyphens
   const words = text.match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu) || [];
-  // Count non-whitespace characters
-  const chars = text.match(/\S/gu) || [];
+  // Normalize whitespace: count total characters including inter-word spacing, matching Overleaf standard
+  const normalized = text.replace(/\s+/g, ' ').trim();
   return {
     words: words.length,
-    characters: chars.length,
+    characters: normalized.length,
   };
 }
 
@@ -46,33 +46,43 @@ export function countWordsAndChars(text: string): TeXCountItem {
 export function cleanLatexMarkup(raw: string): string {
   let s = raw;
 
-  // Remove math blocks
-  s = s.replace(/\$\$[\s\S]*?\$\$/g, ' ');
-  s = s.replace(/\\\[[\s\S]*?\\\]/g, ' ');
-  s = s.replace(/\\begin\{(?:equation|align|gather|multline|displaymath)\*?\}[\s\S]*?\\end\{(?:equation|align|gather|multline|displaymath)\*?\}/g, ' ');
-  s = s.replace(/\$[^$\n]+\$/g, ' ');
-  s = s.replace(/\\\([^)\n]+\\\)/g, ' ');
-
-  // Remove graphics, labels, references, layout commands
-  s = s.replace(/\\includegraphics(?:\s*\[[^\]]*\])?\s*\{[^}]*\}/g, ' ');
-  s = s.replace(/\\(?:label|ref|pageref|eqref|citeyear|nocite|bibliography|bibliographystyle)\s*\{[^}]*\}/g, ' ');
-  s = s.replace(/\\(?:vspace|hspace|vskip|hskip|rule)(?:\*|\s*\[[^\]]*\])?\s*\{[^}]*\}/g, ' ');
-  s = s.replace(/\\(?:centering|raggedright|raggedleft|noindent|clearpage|newpage|bigskip|medskip|smallskip|par)\b/g, ' ');
+  // 1. Line breaks with optional vertical spacing MUST be stripped before display math!
+  // e.g. \\ or \\[1.2em] or \\[0.8em]
   s = s.replace(/\\\\(?:\s*\[[^\]]*\])?/g, ' ');
 
-  // Unwrap formatting tags iteratively (e.g. \textbf{\emph{word}})
-  for (let i = 0; i < 4; i++) {
+  // 2. Remove non-prose environments like tikzpicture and pgfplots
+  s = s.replace(/\\begin\{(?:tikzpicture|pgfplots|axis|tikzpicture\*)\}[\s\S]*?\\end\{(?:tikzpicture|pgfplots|axis|tikzpicture\*)\}/g, ' ');
+
+  // 3. Remove math blocks
+  s = s.replace(/\$\$[\s\S]*?\$\$/g, ' ');
+  s = s.replace(/(?<!\\)\\\[[\s\S]*?(?<!\\)\\\]/g, ' ');
+  s = s.replace(/\\begin\{(?:equation|align|gather|multline|displaymath|flalign)\*?\}[\s\S]*?\\end\{(?:equation|align|gather|multline|displaymath|flalign)\*?\}/g, ' ');
+  s = s.replace(/(?<!\\)\$[^$\n]+(?<!\\)\$/g, ' ');
+  s = s.replace(/(?<!\\)\\\([\s\S]*?(?<!\\)\\\)/g, ' ');
+
+  // 4. Remove graphics, labels, references, layout commands
+  s = s.replace(/\\includegraphics(?:\s*\[[^\]]*\])?\s*\{[^}]*\}/g, ' ');
+  s = s.replace(/\\(?:label|ref|pageref|eqref|citeyear|nocite|bibliography|bibliographystyle|hypersetup|tableofcontents|newpage|clearpage|bigskip|medskip|smallskip|par|noindent|centering|raggedright|raggedleft)\b(?:\{[^}]*\})?/g, ' ');
+  s = s.replace(/\\(?:vspace|hspace|vskip|hskip|rule)(?:\*|\s*\[[^\]]*\])?\s*\{[^}]*\}/g, ' ');
+
+  // 5. Unwrap formatting tags iteratively (e.g. \textbf{\emph{word}})
+  for (let i = 0; i < 5; i++) {
     const prev = s;
-    s = s.replace(/\\(?:textbf|textit|textsl|textsc|texttt|textsf|textrm|emph|underline|textnormal|text|mbox)\s*\{([^{}]*)\}/g, '$1');
+    s = s.replace(/\\(?:textbf|textit|textsl|textsc|texttt|textsf|textrm|emph|underline|textnormal|text|mbox|textls|color)\s*(?:\[[^\]]*\])?\s*\{([^{}]*)\}/g, '$1');
     s = s.replace(/\\(?:href\s*\{[^}]*\}|url)\s*\{([^{}]*)\}/g, '$1');
     if (s === prev) break;
   }
 
-  // Strip remaining commands with arguments
+  // 6. Strip environment begin/end tags (e.g. \begin{center}, \end{spacing})
+  s = s.replace(/\\(?:begin|end)\{[^}]*\}/g, ' ');
+
+  // 7. Strip remaining commands with arguments
   s = s.replace(/\\[a-zA-Z]+(?:\s*\[[^\]]*\])?\s*\{([^{}]*)\}/g, '$1');
-  // Strip command names without arguments
+
+  // 8. Strip command names without arguments
   s = s.replace(/\\[a-zA-Z]+/g, ' ');
-  // Replace non-breaking space and braces
+
+  // 9. Replace non-breaking space and braces
   s = s.replace(/[~{}]/g, ' ');
 
   return s;
@@ -114,7 +124,7 @@ export function parseTeXBreakdown(rawText: string): TeXCountBreakdown {
   const headerParts: string[] = [];
   const headerRegex = /\\(?:part|chapter|section|subsection|subsubsection|paragraph|subparagraph)\*?\s*(?:\[[^\]]*\]\s*)?\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g;
   body = body.replace(headerRegex, (_m, headingText) => {
-    headerParts.push(headingText);
+    headerParts.push(headingText.replace(/\\label\{[^}]*\}/g, ''));
     return ' ';
   });
 
@@ -122,7 +132,7 @@ export function parseTeXBreakdown(rawText: string): TeXCountBreakdown {
   const captionParts: string[] = [];
   const captionRegex = /\\(?:caption\*?|captionof\*?\{[^}]*\})\s*(?:\[[^\]]*\]\s*)?\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g;
   body = body.replace(captionRegex, (_m, capText) => {
-    captionParts.push(capText);
+    captionParts.push(capText.replace(/\\label\{[^}]*\}/g, ''));
     return ' ';
   });
 
