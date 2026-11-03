@@ -325,7 +325,7 @@ export class BuildController {
       this.residentContext=project;this.residentSources=options.sourceFiles;
       // Missing output forces latexmk to run without throwing away its dependency
       // database, references, bibliography or other reusable auxiliary files.
-      const maxRepeatPerl = options.automatic ? '$max_repeat=1; $bibtex_use=1;' : '$max_repeat=5;';
+      const maxRepeatPerl = options.automatic ? '$max_repeat=2;' : '$max_repeat=5;';
       const extraFlags = options.automatic ? ['-silent'] : [];
       const args=['-norc',engineFlag[options.engine],'-interaction=nonstopmode','-halt-on-error','-file-line-error','-synctex=1','-recorder','-e',maxRepeatPerl,'-no-shell-escape',...extraFlags,'-outdir='+output,'./'+path.basename(options.root)];
       this.log('\n'+JSON.stringify({executable:options.executable,args,cwd:input})+'\n');

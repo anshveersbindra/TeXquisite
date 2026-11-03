@@ -65,3 +65,12 @@ test('TeX version banner is never extracted as a compiler error message',()=>{
  assert.notEqual(result.message,'This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14) 3 NOV 2026 11:15');
  assert.doesNotMatch(result.message,/^This is/);
 });
+
+test('Package: infwarerr informational banner is never extracted as a compiler error message',()=>{
+ const text='This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025)\nPackage: infwarerr 2019/12/03 v1.5 Providing info/warning/error messages (HO)\nLatexmk: Errors, so I did not complete making targets\nCollected error summary:\n  pdflatex: Command gave return code 1\n';
+ const result=parseDiagnostic(text,inputs);
+ assert.notEqual(result.message,'Package: infwarerr 2019/12/03 v1.5 Providing info/warning/error messages (HO)');
+ assert.doesNotMatch(result.message,/infwarerr/i);
+ assert.doesNotMatch(result.message,/Providing info\/warning\/error messages/i);
+});
+

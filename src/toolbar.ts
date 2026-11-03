@@ -57,15 +57,25 @@ export function toolbarButton(id: string, name: string, label: string) {
     button.dataset.icon = name;
     return;
   }
-  if (id === 'toggleProject') {
+  const labeledButtons: Record<string, string> = {
+    toggleProject: 'Files',
+    openFolderHeader: 'Folder',
+    new: 'New',
+    open: 'Open',
+    save: 'Save',
+    reload: 'Reload',
+    saveCopy: 'Copy',
+    cancel: 'Cancel',
+    toggleStatus: 'Status',
+    wordCountBtn: 'Words',
+    toggleProblems: 'Problems',
+    toggleLog: 'Log',
+    settings: 'Settings'
+  };
+
+  if (labeledButtons[id]) {
     button.className = 'toolbar-btn has-label';
-    button.innerHTML = `${svg(name)} <span>Files</span>`;
-    button.dataset.icon = name;
-    return;
-  }
-  if (id === 'openFolderHeader') {
-    button.className = 'toolbar-btn has-label';
-    button.innerHTML = `${svg(name)} <span>Folder</span>`;
+    button.innerHTML = `${svg(name)} <span>${labeledButtons[id]}</span>`;
     button.dataset.icon = name;
     return;
   }
