@@ -50,7 +50,7 @@ export function toolbarButton(id: string, name: string, label: string) {
   }
   if (id === 'live') {
     button.className = 'live-btn';
-    button.innerHTML = `<span class="live-dot">●</span> <span>Live</span>`;
+    button.innerHTML = `<span class="live-dot" aria-hidden="true"></span> <span>Live</span>`;
     button.dataset.icon = name;
     return;
   }

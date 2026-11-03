@@ -770,7 +770,7 @@ function renderProblems(){
      if (issue.file && issue.line) {
        const link = document.createElement('button');
        link.className = 'file-line-btn';
-       link.innerHTML = `<span class="loc-icon">↗</span> ${issue.file.split(/[\\/]/).at(-1)}: line ${issue.line}`;
+       link.innerHTML = `<svg class="loc-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"></line><polyline points="7 7 17 7 17 17"></polyline></svg> <span>${issue.file.split(/[\\/]/).at(-1)}: line ${issue.line}</span>`;
        link.title = `Jump to line ${issue.line} in ${issue.file}`;
        link.onclick = () => void command(() => navigateProblem(issue));
        metaRow.append(link);
@@ -786,7 +786,7 @@ function renderProblems(){
      if (advice) {
        const adviceBox = document.createElement('div');
        adviceBox.className = 'card-advice';
-       adviceBox.innerHTML = `<span class="advice-icon">💡</span> <span>${advice}</span>`;
+       adviceBox.innerHTML = `<svg class="advice-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg> <span>${advice}</span>`;
        card.append(adviceBox);
      }
 

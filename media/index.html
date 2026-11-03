@@ -50,11 +50,13 @@
   </div>
 </header>
 <div id="toolchainNotice" role="status" hidden class="app-banner banner-warning">
-  <span class="banner-icon">⚠</span>
+  <span class="banner-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
   <span id="toolchainNoticeText"></span>
   <div class="banner-actions">
     <button id="toolchainNoticeSettings" type="button">Preferences…</button>
-    <button id="dismissToolchainNotice" type="button" class="banner-close" title="Dismiss notice">✕</button>
+    <button id="dismissToolchainNotice" type="button" class="banner-close" title="Dismiss notice" aria-label="Dismiss notice">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
   </div>
 </div>
 
@@ -63,14 +65,18 @@
   <div class="banner-actions">
     <button id="diagnosticLocation" hidden></button>
     <button id="diagnosticLog">Open build log</button>
-    <button id="dismissDiagnostics" type="button" class="banner-close" title="Dismiss error banner">✕</button>
+    <button id="dismissDiagnostics" type="button" class="banner-close" title="Dismiss error banner" aria-label="Dismiss error banner">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
   </div>
 </section>
 <div id="backupWarning" hidden class="app-banner banner-warning" role="alert">
   <span id="backupWarningText"></span>
   <div class="banner-actions">
     <button id="reviewBackups">Review backups</button>
-    <button id="dismissBackupWarning" type="button" class="banner-close" title="Dismiss">✕</button>
+    <button id="dismissBackupWarning" type="button" class="banner-close" title="Dismiss" aria-label="Dismiss">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
   </div>
 </div>
 
@@ -147,13 +153,15 @@
           </div>
           <div id="pdfDiagnosticsGroup" class="pdf-diagnostics-group" title="Compilation diagnostics">
             <button id="pdfErrorBadge" type="button" class="pdf-badge pdf-badge-error" title="0 errors" hidden>
-              <span class="badge-icon">✕</span><span class="badge-count" id="pdfErrorCount">0</span>
+              <svg class="badge-svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              <span class="badge-count" id="pdfErrorCount">0</span>
             </button>
             <button id="pdfWarningBadge" type="button" class="pdf-badge pdf-badge-warning" title="0 warnings" hidden>
-              <span class="badge-icon">⚠</span><span class="badge-count" id="pdfWarningCount">0</span>
+              <svg class="badge-svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              <span class="badge-count" id="pdfWarningCount">0</span>
             </button>
             <button id="pdfSuccessBadge" type="button" class="pdf-badge pdf-badge-success" title="Preview up to date · No errors">
-              <span class="badge-icon">✓</span>
+              <svg class="badge-svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
             </button>
           </div>
         </div>
@@ -197,7 +205,19 @@
         <button data-math="pi" title="Insert pi (Alt+P)">π</button>
       </div>
       <div id="pdfViewport">
-        <div id="empty"><span class="paper-icon">∑</span><h2>Your PDF will appear here</h2><p>Open a .tex file and start typing.<br>A failed build will never replace a successful preview.</p></div>
+        <div id="empty">
+          <div class="empty-doc-art">
+            <svg width="42" height="50" viewBox="0 0 24 28" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v20a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="8" y1="13" x2="16" y2="13" opacity="0.4"></line>
+              <line x1="8" y1="17" x2="16" y2="17" opacity="0.4"></line>
+              <line x1="8" y1="21" x2="12" y2="21" opacity="0.4"></line>
+            </svg>
+          </div>
+          <h2>Compiled PDF Preview</h2>
+          <p>Edit your document or press <strong>Recompile ⌘B</strong>.<br>A failed build will never replace your last verified preview.</p>
+        </div>
         <div id="pages"></div>
         <textarea id="previewInput" tabindex="-1" aria-label="Edit text or math in the PDF" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
       </div>
@@ -207,7 +227,9 @@
         <div class="overleaf-error-header">
           <div class="overleaf-error-title-row">
             <div class="overleaf-error-badge-title">
-              <span class="overleaf-error-icon">✕</span>
+              <span class="overleaf-error-icon">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+              </span>
               <div class="overleaf-error-headings">
                 <h3 id="errorOverlayHeading">LaTeX Compilation Issues</h3>
                 <p id="errorOverlaySubheading">Fix the reported LaTeX errors to update the preview PDF.</p>
@@ -215,10 +237,12 @@
             </div>
             <div class="overleaf-error-actions">
               <button id="errorOverlayViewPdfBtn" type="button" class="overleaf-action-btn primary" title="View last verified PDF">
-                <span class="btn-icon">📄</span> View PDF anyway
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                <span>View PDF anyway</span>
               </button>
               <button id="errorOverlayRawLogBtn" type="button" class="overleaf-action-btn secondary" title="Inspect full raw compiler output">
-                <span class="btn-icon">📋</span> View raw log
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                <span>View raw log</span>
               </button>
             </div>
           </div>
@@ -249,7 +273,10 @@
     <div class="log-actions" onclick="event.stopPropagation()">
       <button id="copyLogBtn" type="button" title="Copy entire build log">Copy log</button>
       <button id="clearLogBtn" type="button" title="Clear log display">Clear</button>
-      <button id="closeLogBtn" type="button" title="Close build log">✕ Close</button>
+      <button id="closeLogBtn" type="button" title="Close build log">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        <span>Close</span>
+      </button>
     </div>
   </summary>
   <pre id="log" tabindex="0"></pre>
@@ -265,7 +292,9 @@
       <button id="previewNoticeError">Go to error</button>
       <button id="previewNoticeRetry">Retry</button>
       <button id="previewNoticeDetails">Details</button>
-      <button id="previewNoticeDismiss" class="notice-dismiss-btn" title="Dismiss notice">✕</button>
+      <button id="previewNoticeDismiss" class="notice-dismiss-btn" title="Dismiss notice" aria-label="Dismiss notice">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
   </aside>
   <div id="statusDetails">
@@ -280,7 +309,9 @@
   <div class="settings-modal">
     <div class="settings-header">
       <h2>Preferences</h2>
-      <button id="closeSettingsX" type="button" class="close-x" aria-label="Close">✕</button>
+      <button id="closeSettingsX" type="button" class="close-x" aria-label="Close">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
     </div>
     <nav class="settings-tabs" role="tablist">
       <button type="button" class="tab-btn active" data-tab="tab-appearance" role="tab">Appearance</button>
@@ -425,7 +456,9 @@
 <dialog id="projectSearchDialog">
   <div class="dialog-header">
     <h2>Find and replace in project</h2>
-    <button type="button" class="close-x" id="closeProjectSearchHeader" aria-label="Close dialog">✕</button>
+    <button type="button" class="close-x" id="closeProjectSearchHeader" aria-label="Close dialog">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+    </button>
   </div>
   <form id="projectSearchForm">
     <label>Find<input id="projectSearchQuery" required></label>

@@ -58,3 +58,10 @@ test('Converter and bibliography failures identify the failed stage instead of t
  const converter=parseDiagnostic('This is pdfTeX, Version 3\nOutput written on main.dvi\nError: /typecheck in --div--\nGPL Ghostscript 10.05.1: Unrecoverable error, exit code 1\n',inputs);assert.deepEqual(converter,{kind:'build',message:'PostScript conversion failed: /typecheck in --div--'});
  assert.deepEqual(parseDiagnostic("This is BibTeX\nI couldn't open style file custom.bst\n",inputs),{kind:'build',message:'Bibliography file not found: custom.bst'});
 });
+
+test('TeX version banner is never extracted as a compiler error message',()=>{
+ const text='This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14) 3 NOV 2026 11:15\nLatexmk: Errors, so I did not complete making targets\nCollected error summary:\n  pdflatex: Command gave return code 1\n';
+ const result=parseDiagnostic(text,inputs);
+ assert.notEqual(result.message,'This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.12.14) 3 NOV 2026 11:15');
+ assert.doesNotMatch(result.message,/^This is/);
+});
