@@ -13,7 +13,7 @@ import {lintGutter,setDiagnostics,diagnosticCount} from '@codemirror/lint';
 import {StreamLanguage,syntaxHighlighting,HighlightStyle} from '@codemirror/language';
 import {tags as t} from '@lezer/highlight';
 import {stex} from '@codemirror/legacy-modes/mode/stex';
-import {installToolbar,toolbarButton,toolbarSelect} from './toolbar';
+import {installToolbar,toolbarButton,toolbarSelect,updateToolbarSelects} from './toolbar';
 import {renderSvg} from './icons';
 import {ProjectSidebar} from './project-sidebar';
 import {ProjectSearchUI} from './project-search-ui';
@@ -183,6 +183,7 @@ function applyTheme(theme?: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm', pdfI
   if (view) {
     view.dispatch({ effects: themeCompartment.reconfigure(themeExt) });
   }
+  updateToolbarSelects(isDark);
 }
 
 window.matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener('change', e => {
