@@ -638,9 +638,51 @@ setInterval(()=>{if(previewUpdating)refreshPreviewStatus();},100);
 let editScheduled=false;
 let editChain=Promise.resolve();
 let problemRenderKey='';
+let activePreviewTab: 'pdf' | 'errors' = 'pdf';
+let currentOverlayFilter: 'all' | 'error' | 'warning' = 'all';
+let userDismissedErrorOverlay = false;
+
+function setPreviewView(tab: 'pdf' | 'errors', reason: 'user' | 'auto' = 'user') {
+  activePreviewTab = tab;
+  if (reason === 'user') {
+    userDismissedErrorOverlay = (tab === 'pdf');
+  }
+  const pdfBtn = document.getElementById('viewSwitchPdf');
+  const errBtn = document.getElementById('viewSwitchErrors');
+  if (pdfBtn) pdfBtn.classList.toggle('active', tab === 'pdf');
+  if (errBtn) errBtn.classList.toggle('active', tab === 'errors');
+
+  const pdfViewport = document.getElementById('pdfViewport');
+  const overlay = document.getElementById('previewErrorOverlay');
+  const pdfToolbar = document.querySelector<HTMLElement>('.pdf-toolbar');
+  const mathToolbar = document.querySelector<HTMLElement>('#mathTools');
+
+  if (tab === 'errors') {
+    if (pdfViewport) pdfViewport.hidden = true;
+    if (overlay) overlay.hidden = false;
+    if (pdfToolbar) pdfToolbar.classList.add('in-error-view');
+    if (mathToolbar) mathToolbar.classList.add('in-error-view');
+  } else {
+    if (pdfViewport) pdfViewport.hidden = false;
+    if (overlay) overlay.hidden = true;
+    if (pdfToolbar) pdfToolbar.classList.remove('in-error-view');
+    if (mathToolbar) mathToolbar.classList.remove('in-error-view');
+    scheduleFit(true);
+  }
+}
+
+function updateOverlayFilterPills() {
+  const pillAll = document.getElementById('pillAllErrors');
+  const pillErr = document.getElementById('pillOnlyErrors');
+  const pillWarn = document.getElementById('pillOnlyWarnings');
+  if (pillAll) pillAll.classList.toggle('active', currentOverlayFilter === 'all');
+  if (pillErr) pillErr.classList.toggle('active', currentOverlayFilter === 'error');
+  if (pillWarn) pillWarn.classList.toggle('active', currentOverlayFilter === 'warning');
+}
+
 function renderProblems(){
  diagnosticTracker.sync(compileIssue&&!projectProblems.some(i=>i.id===compileIssue!.id)?[...projectProblems,compileIssue]:projectProblems,active,latestEdit?.id,view?.state.doc);
- const key=JSON.stringify([projectProblems.map(i=>[i.id,i.sourceHash,i.line,i.message,diagnosticTracker.pending(i)]),projectProblems.some(i=>i.editId!==latestEdit?.id),el<HTMLSelectElement>('problemFilter').value]);if(key===problemRenderKey)return;problemRenderKey=key;
+ const key=JSON.stringify([projectProblems.map(i=>[i.id,i.sourceHash,i.line,i.message,diagnosticTracker.pending(i)]),projectProblems.some(i=>i.editId!==latestEdit?.id),el<HTMLSelectElement>('problemFilter').value,currentOverlayFilter,activePreviewTab]);if(key===problemRenderKey)return;problemRenderKey=key;
  const issues=projectProblems,checking=issues.filter(i=>diagnosticTracker.pending(i)).length,errors=issues.filter(i=>i.severity!=='warning'&&!diagnosticTracker.pending(i)).length,warnings=issues.filter(i=>i.severity==='warning').length;
  const summary=`${errors} error${errors===1?'':'s'} · ${warnings} warning${warnings===1?'':'s'}`+(checking?` · ${checking} checking`:'');
  el('problemSummary').textContent=summary;
@@ -663,6 +705,110 @@ function renderProblems(){
  if (succBadge) {
    succBadge.hidden = errors > 0 || warnings > 0;
  }
+
+ const switchBadge = document.getElementById('viewSwitchBadge');
+ if (switchBadge) {
+   if (errors > 0) {
+     switchBadge.textContent = String(errors);
+     switchBadge.className = 'switch-badge error';
+     switchBadge.hidden = false;
+   } else if (warnings > 0) {
+     switchBadge.textContent = String(warnings);
+     switchBadge.className = 'switch-badge warning';
+     switchBadge.hidden = false;
+   } else {
+     switchBadge.hidden = true;
+   }
+ }
+
+ const pillAllCount = document.getElementById('pillAllCount');
+ const pillErrCount = document.getElementById('pillErrCount');
+ const pillWarnCount = document.getElementById('pillWarnCount');
+ if (pillAllCount) pillAllCount.textContent = String(issues.length);
+ if (pillErrCount) pillErrCount.textContent = String(errors);
+ if (pillWarnCount) pillWarnCount.textContent = String(warnings);
+
+ const heading = document.getElementById('errorOverlayHeading');
+ const subheading = document.getElementById('errorOverlaySubheading');
+ if (heading) {
+   heading.textContent = errors > 0
+     ? `${errors} LaTeX Compilation Error${errors === 1 ? '' : 's'}`
+     : warnings > 0 ? `${warnings} LaTeX Warning${warnings === 1 ? '' : 's'}` : 'LaTeX Compilation Issues';
+ }
+ if (subheading) {
+   subheading.textContent = errors > 0
+     ? 'Fix the LaTeX errors below to update your compiled PDF preview.'
+     : warnings > 0 ? 'Document compiled with warnings. You can review them below.' : 'No compilation issues reported.';
+ }
+
+ // Overleaf behavior: automatically switch preview pane to error dialogue on build failure
+ if (errors > 0 && !userDismissedErrorOverlay && activePreviewTab !== 'errors') {
+   setPreviewView('errors', 'auto');
+ } else if (errors === 0 && activePreviewTab === 'errors' && !issues.some(i => i.severity !== 'warning')) {
+   setPreviewView('pdf', 'auto');
+ }
+
+ // Render Overleaf-style error cards into #errorOverlayList
+ const overlayList = document.getElementById('errorOverlayList');
+ if (overlayList) {
+   overlayList.replaceChildren();
+   const filtered = issues.filter(i => currentOverlayFilter === 'all' || (i.severity ?? 'error') === currentOverlayFilter);
+   for (const issue of filtered) {
+     const isWarn = issue.severity === 'warning';
+     const card = document.createElement('div');
+     card.className = `overleaf-error-card ${isWarn ? 'is-warning' : 'is-error'}`;
+     card.setAttribute('role', 'listitem');
+
+     const metaRow = document.createElement('div');
+     metaRow.className = 'card-meta-row';
+
+     const tag = document.createElement('span');
+     tag.className = `error-tag ${isWarn ? 'warning' : 'error'}`;
+     tag.textContent = isWarn ? 'WARNING' : 'ERROR';
+     metaRow.append(tag);
+
+     if (issue.file && issue.line) {
+       const link = document.createElement('button');
+       link.className = 'file-line-btn';
+       link.innerHTML = `<span class="loc-icon">↗</span> ${issue.file.split(/[\\/]/).at(-1)}: line ${issue.line}`;
+       link.title = `Jump to line ${issue.line} in ${issue.file}`;
+       link.onclick = () => void command(() => navigateProblem(issue));
+       metaRow.append(link);
+     }
+     card.append(metaRow);
+
+     const msg = document.createElement('div');
+     msg.className = 'card-msg';
+     msg.textContent = issue.message;
+     card.append(msg);
+
+     const advice = diagnosticAdvice(issue.message);
+     if (advice) {
+       const adviceBox = document.createElement('div');
+       adviceBox.className = 'card-advice';
+       adviceBox.innerHTML = `<span class="advice-icon">💡</span> <span>${advice}</span>`;
+       card.append(adviceBox);
+     }
+
+     const suggestion = diagnosticSuggestion(issue.message);
+     if (suggestion) {
+       const apply = document.createElement('button');
+       apply.className = 'apply-suggestion card-fix-action';
+       configureSuggestion(apply, issue);
+       card.append(apply);
+     }
+
+     overlayList.append(card);
+   }
+
+   if (!overlayList.childElementCount) {
+     const empty = document.createElement('div');
+     empty.className = 'overleaf-empty-card';
+     empty.innerHTML = `<h4>No issues match this filter</h4><p>${issues.length ? 'Try switching the filter pills above.' : 'Everything compiled cleanly!'}</p>`;
+     overlayList.append(empty);
+   }
+ }
+
  const stale=issues.some(i=>i.editId!==latestEdit?.id);el('problemState').textContent=stale?'Source changed · waiting for preview':issues.some(i=>i.id.startsWith('local-recovery-'))?'Current local preview':issues.length?'Latest full build':'No problems reported by the latest full build';
  const list=el('problemList');list.replaceChildren();const filter=el<HTMLSelectElement>('problemFilter').value;
  for(const issue of issues.filter(i=>filter==='all'||(i.severity??'error')===filter)){
@@ -679,27 +825,47 @@ function renderProblems(){
 el('problemFilter').onchange=renderProblems;
 el('toggleProblems').onclick=()=>{const panel=el<HTMLDetailsElement>('problems');panel.open=!panel.open;el('toggleProblems').setAttribute('aria-expanded',String(panel.open));};
 el('problems').ontoggle=()=>el('toggleProblems').setAttribute('aria-expanded',String(el<HTMLDetailsElement>('problems').open));
+
+const viewSwitchPdf = document.getElementById('viewSwitchPdf');
+if (viewSwitchPdf) viewSwitchPdf.onclick = () => setPreviewView('pdf', 'user');
+
+const viewSwitchErrors = document.getElementById('viewSwitchErrors');
+if (viewSwitchErrors) viewSwitchErrors.onclick = () => setPreviewView('errors', 'user');
+
+const overlayViewPdfBtn = document.getElementById('errorOverlayViewPdfBtn');
+if (overlayViewPdfBtn) overlayViewPdfBtn.onclick = () => setPreviewView('pdf', 'user');
+
+const overlayRawLogBtn = document.getElementById('errorOverlayRawLogBtn');
+if (overlayRawLogBtn) overlayRawLogBtn.onclick = () => {
+  const logs = el<HTMLDetailsElement>('logs');
+  logs.open = true;
+  logs.scrollIntoView({ behavior: 'smooth' });
+};
+
+const pillAll = document.getElementById('pillAllErrors');
+if (pillAll) pillAll.onclick = () => { currentOverlayFilter = 'all'; updateOverlayFilterPills(); renderProblems(); };
+const pillErr = document.getElementById('pillOnlyErrors');
+if (pillErr) pillErr.onclick = () => { currentOverlayFilter = 'error'; updateOverlayFilterPills(); renderProblems(); };
+const pillWarn = document.getElementById('pillOnlyWarnings');
+if (pillWarn) pillWarn.onclick = () => { currentOverlayFilter = 'warning'; updateOverlayFilterPills(); renderProblems(); };
+
 const pdfErrBtn = document.getElementById('pdfErrorBadge');
 if (pdfErrBtn) pdfErrBtn.onclick = () => {
-  const panel = el<HTMLDetailsElement>('problems');
-  panel.open = true;
-  el<HTMLSelectElement>('problemFilter').value = 'error';
+  setPreviewView('errors', 'user');
+  currentOverlayFilter = 'error';
+  updateOverlayFilterPills();
   renderProblems();
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
 const pdfWarnBtn = document.getElementById('pdfWarningBadge');
 if (pdfWarnBtn) pdfWarnBtn.onclick = () => {
-  const panel = el<HTMLDetailsElement>('problems');
-  panel.open = true;
-  el<HTMLSelectElement>('problemFilter').value = 'warning';
+  setPreviewView('errors', 'user');
+  currentOverlayFilter = 'warning';
+  updateOverlayFilterPills();
   renderProblems();
-  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
 const pdfSuccBtn = document.getElementById('pdfSuccessBadge');
 if (pdfSuccBtn) pdfSuccBtn.onclick = () => {
-  const panel = el<HTMLDetailsElement>('problems');
-  panel.open = !panel.open;
-  if (panel.open) renderProblems();
+  setPreviewView('pdf', 'user');
 };
 let markerGeneration=0,markerKey='';
 function syncErrorMarker(){
@@ -1169,7 +1335,7 @@ for(const [button,method] of [['new','new'],['open','open'],['support','support'
   model=response;renderEditor();
   if(method==='saveCopy'&&model.docs.find((d:any)=>d.path===active)?.dirty){lastSent.delete(active);await flush();}
 });
-for(const method of ['build','cancel','export','previous'])el(method).onclick=()=>void command(async()=>{if(method!=='cancel')await tabActivationChain.catch(()=>{});await flush();await api.call(method);});
+for(const method of ['build','cancel','export','previous'])el(method).onclick=()=>void command(async()=>{if(method==='build')userDismissedErrorOverlay=false;if(method!=='cancel')await tabActivationChain.catch(()=>{});await flush();await api.call(method);});
 el('live').onclick=()=>void command(async()=>{await flush();model.onSave=await api.call('live');renderTabs();renderIssue();refreshPreviewStatus();});
 el('toggleStatus').onclick=()=>void command(async()=>{model.statusBar=model.statusBar===false;renderTabs();await api.call('statusBar',model.statusBar);});
 el('toggleLog').onclick=()=>{const log=el<HTMLDetailsElement>('logs');log.open=!log.open;};

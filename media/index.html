@@ -6,26 +6,47 @@
 <header>
   <div class="brand"><img src="texquisite-logo.png" alt="TeXquisite" width="84" height="30"></div>
   <div class="actions">
-    <button id="toggleProject" aria-expanded="false" title="Toggle file explorer (Cmd+Shift+P)">Files</button>
-    <button id="openFolderHeader" title="Open project folder (Cmd+Shift+O)">Open Folder…</button>
-    <button id="new">New…</button>
-    <button id="open">Open…</button>
-    <button id="save">Save</button>
-    <button id="reload">Reload disk</button>
-    <button id="saveCopy">Save copy…</button>
-    <button id="build" class="primary">Build now <kbd>⌘B</kbd></button>
-    <button id="live" title="Automatically save and rebuild while typing">● Live — pause</button>
-    <button id="cancel">Cancel build</button>
-    <select id="panelLayout" aria-label="Panel layout" title="Arrange source and output panels">
-      <option value="side-by-side">Side by side</option>
-      <option value="output-top">Output above source</option>
-      <option value="source-top">Source above output</option>
-    </select>
-    <button id="toggleStatus" aria-pressed="true">Status bar</button>
-    <button id="toggleProblems">Problems</button>
-    <button id="toggleLog">Build log</button>
-    <button id="toggleTheme" title="Appearance: Switch theme">Theme</button>
-    <button id="settings" title="Preferences (Cmd+,)">Preferences</button>
+    <!-- Group: File & Workspace -->
+    <div class="toolbar-group">
+      <button id="toggleProject" class="toolbar-btn" aria-expanded="false" title="Toggle file explorer (Cmd+Shift+P)">Files</button>
+      <button id="openFolderHeader" class="toolbar-btn" title="Open project folder (Cmd+Shift+O)">Open Folder</button>
+      <button id="new" class="toolbar-icon-btn" title="New document (Cmd+N)">New</button>
+      <button id="open" class="toolbar-icon-btn" title="Open document (Cmd+O)">Open</button>
+      <button id="save" class="toolbar-icon-btn" title="Save document (Cmd+S)">Save</button>
+      <button id="reload" class="toolbar-icon-btn" title="Reload from disk">Reload</button>
+      <button id="saveCopy" class="toolbar-icon-btn" title="Save copy of active file">Copy</button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <!-- Group: Recompile & Live Preview (Overleaf-style prominent button) -->
+    <div class="toolbar-group compile-group">
+      <button id="build" class="recompile-btn" title="Recompile document (Cmd+B)">Recompile <kbd>⌘B</kbd></button>
+      <button id="live" class="live-btn" title="Live Preview: automatically save and rebuild while typing">Live</button>
+      <button id="cancel" class="toolbar-icon-btn" title="Cancel current compilation">Cancel</button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <!-- Group: Layout & Appearance -->
+    <div class="toolbar-group">
+      <select id="panelLayout" aria-label="Panel layout" title="Arrange source and output panels">
+        <option value="side-by-side">Side by side</option>
+        <option value="output-top">Output above source</option>
+        <option value="source-top">Source above output</option>
+      </select>
+      <button id="toggleTheme" class="toolbar-btn" title="Appearance: Switch theme">Theme</button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <!-- Group: Diagnostics & Settings -->
+    <div class="toolbar-group">
+      <button id="toggleStatus" class="toolbar-icon-btn" aria-pressed="true" title="Toggle status bar">Status</button>
+      <button id="toggleProblems" class="toolbar-icon-btn" title="Project problems">Problems</button>
+      <button id="toggleLog" class="toolbar-icon-btn" title="View build log">Log</button>
+      <button id="settings" class="toolbar-icon-btn" title="Preferences (Cmd+,)">Settings</button>
+    </div>
   </div>
 </header>
 <div id="toolchainNotice" role="status" hidden class="app-banner banner-warning">
@@ -118,6 +139,12 @@
       <div class="pane-title">
         <div class="pane-title-left">
           <span>COMPILED DOCUMENT</span>
+          <div class="preview-mode-switch" role="tablist">
+            <button id="viewSwitchPdf" type="button" class="preview-switch-btn active" role="tab" title="View compiled PDF document">PDF</button>
+            <button id="viewSwitchErrors" type="button" class="preview-switch-btn" role="tab" title="View LaTeX compilation errors and logs">
+              Errors &amp; Logs <span id="viewSwitchBadge" class="switch-badge error" hidden>0</span>
+            </button>
+          </div>
           <div id="pdfDiagnosticsGroup" class="pdf-diagnostics-group" title="Compilation diagnostics">
             <button id="pdfErrorBadge" type="button" class="pdf-badge pdf-badge-error" title="0 errors" hidden>
               <span class="badge-icon">✕</span><span class="badge-count" id="pdfErrorCount">0</span>
@@ -173,6 +200,35 @@
         <div id="empty"><span class="paper-icon">∑</span><h2>Your PDF will appear here</h2><p>Open a .tex file and start typing.<br>A failed build will never replace a successful preview.</p></div>
         <div id="pages"></div>
         <textarea id="previewInput" tabindex="-1" aria-label="Edit text or math in the PDF" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea>
+      </div>
+
+      <!-- Overleaf-Style In-Pane Error Dialogue (replaces PDF on error) -->
+      <div id="previewErrorOverlay" hidden class="preview-error-overlay">
+        <div class="overleaf-error-header">
+          <div class="overleaf-error-title-row">
+            <div class="overleaf-error-badge-title">
+              <span class="overleaf-error-icon">✕</span>
+              <div class="overleaf-error-headings">
+                <h3 id="errorOverlayHeading">LaTeX Compilation Issues</h3>
+                <p id="errorOverlaySubheading">Fix the reported LaTeX errors to update the preview PDF.</p>
+              </div>
+            </div>
+            <div class="overleaf-error-actions">
+              <button id="errorOverlayViewPdfBtn" type="button" class="overleaf-action-btn primary" title="View last verified PDF">
+                <span class="btn-icon">📄</span> View PDF anyway
+              </button>
+              <button id="errorOverlayRawLogBtn" type="button" class="overleaf-action-btn secondary" title="Inspect full raw compiler output">
+                <span class="btn-icon">📋</span> View raw log
+              </button>
+            </div>
+          </div>
+          <div class="overleaf-filter-pills" role="tablist">
+            <button id="pillAllErrors" type="button" class="filter-pill active" data-filter="all">All Issues (<span id="pillAllCount">0</span>)</button>
+            <button id="pillOnlyErrors" type="button" class="filter-pill" data-filter="error">Errors (<span id="pillErrCount">0</span>)</button>
+            <button id="pillOnlyWarnings" type="button" class="filter-pill" data-filter="warning">Warnings (<span id="pillWarnCount">0</span>)</button>
+          </div>
+        </div>
+        <div id="errorOverlayList" class="overleaf-error-list" role="list"></div>
       </div>
     </section>
   </main>

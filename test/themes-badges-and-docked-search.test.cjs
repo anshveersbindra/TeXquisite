@@ -93,10 +93,10 @@ test('Long document compilation is optimized with recorder, maxrepeat, and scale
   const core = fs.readFileSync(path.join(__dirname, '../src/core.ts'), 'utf8');
   const main = fs.readFileSync(path.join(__dirname, '../src/main.ts'), 'utf8');
 
-  // Core adds -recorder and bounded repeatLimit
+  // Core adds -recorder and bounded repeat limit via Perl config code
   assert.match(core, /'-recorder'/);
-  assert.match(core, /`-maxrepeat=\$\{repeatLimit\}`/);
-  assert.match(core, /repeatLimit\s*=\s*options\.automatic\s*\?\s*'2'\s*:\s*'5'/);
+  assert.match(core, /'-e',\s*maxRepeatPerl/);
+  assert.match(core, /maxRepeatPerl\s*=\s*options\.automatic\s*\?\s*'\$max_repeat=2;'\s*:\s*'\$max_repeat=5;'/);
 
   // Main debounces based on document length
   assert.match(main, /docLength\s*=\s*text\.length/);

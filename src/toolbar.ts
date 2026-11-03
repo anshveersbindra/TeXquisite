@@ -39,13 +39,39 @@ function svg(name: string, strokeColor = 'currentColor') {
 export function toolbarButton(id: string, name: string, label: string) {
   const button = document.getElementById(id);
   if (!button) return;
+  button.title = label;
+  button.setAttribute('aria-label', label);
+
+  if (id === 'build') {
+    button.className = 'recompile-btn';
+    button.innerHTML = `${svg(name)} <span>Recompile</span> <kbd>⌘B</kbd>`;
+    button.dataset.icon = name;
+    return;
+  }
+  if (id === 'live') {
+    button.className = 'live-btn';
+    button.innerHTML = `<span class="live-dot">●</span> <span>Live</span>`;
+    button.dataset.icon = name;
+    return;
+  }
+  if (id === 'toggleProject') {
+    button.className = 'toolbar-btn has-label';
+    button.innerHTML = `${svg(name)} <span>Files</span>`;
+    button.dataset.icon = name;
+    return;
+  }
+  if (id === 'openFolderHeader') {
+    button.className = 'toolbar-btn has-label';
+    button.innerHTML = `${svg(name)} <span>Folder</span>`;
+    button.dataset.icon = name;
+    return;
+  }
+
   if (button.dataset.icon !== name) {
     button.innerHTML = svg(name);
     button.dataset.icon = name;
   }
   button.classList.add('icon-button');
-  button.title = label;
-  button.setAttribute('aria-label', label);
 }
 
 const selects: [string, string, string][] = [

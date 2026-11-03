@@ -325,8 +325,8 @@ export class BuildController {
       this.residentContext=project;this.residentSources=options.sourceFiles;
       // Missing output forces latexmk to run without throwing away its dependency
       // database, references, bibliography or other reusable auxiliary files.
-      const repeatLimit = options.automatic ? '2' : '5';
-      const args=['-norc',engineFlag[options.engine],'-interaction=nonstopmode','-halt-on-error','-file-line-error','-synctex=1','-recorder',`-maxrepeat=${repeatLimit}`,'-no-shell-escape','-outdir='+output,'./'+path.basename(options.root)];
+      const maxRepeatPerl = options.automatic ? '$max_repeat=2;' : '$max_repeat=5;';
+      const args=['-norc',engineFlag[options.engine],'-interaction=nonstopmode','-halt-on-error','-file-line-error','-synctex=1','-recorder','-e',maxRepeatPerl,'-no-shell-escape','-outdir='+output,'./'+path.basename(options.root)];
       this.log('\n'+JSON.stringify({executable:options.executable,args,cwd:input})+'\n');
       let pdf:Buffer|undefined;
       let navigation:Navigation|undefined;
@@ -406,7 +406,7 @@ export class BuildController {
         nativeAttempted=true;
         if(options.automatic)this.retryingNativeFor=this.sourceIdentity(options);
         const searchFolders=[input,output,path.dirname(path.resolve(options.root)),...(options.supportFolders??[])].map(f=>f.replace(/\\/g,'/')).join(path.delimiter)+path.delimiter;
-        const nativeEnv:NodeJS.ProcessEnv={};
+        const nativeEnv:NodeJS.ProcessEnv={max_print_line:'2000'};
         for(const name of ['TEXINPUTS','BIBINPUTS','BSTINPUTS','TFMFONTS','VFFONTS','T1FONTS','ENCFONTS','TEXFONTMAPS','TEXPSHEADERS']){nativeEnv[name]=searchFolders+(process.env[name]??'');}
         try{await runWithPreviewCompatibility(runProcess,options.executable,args,input,options.timeoutMs,abort.signal,nativeLog,nativeEnv);}
         catch(error){

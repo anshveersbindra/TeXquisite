@@ -29,10 +29,11 @@ test('Real resident and native diagnostics retain captured chapter identity and 
  const broken='Chapter.\n\\undefinedDiagnosticCommand\n';await controller.request({...options,sourceFiles:{[chapter]:broken},editId:'chapter-error'});
  assert.equal(controller.current.id,good.id);const issue=issues.at(-1);assert.equal(issue.file,chapter);assert.equal(issue.line,2);assert.equal(issue.sourceHash,hash(broken));assert.equal(issue.editId,'chapter-error');assert.equal(issue.kind,'tex');
  const nativeIssues=[],native=new BuildController(new ArtifactStore(path.join(directory,'native')),{prepare:async()=>{},commit:()=>{},discard:()=>{},diagnostic:issue=>nativeIssues.push(issue)},()=>{},()=>{});t.after(()=>native.cancel());
- await native.request({...options,sourceFiles:{[chapter]:broken},editId:'native-error',executable:process.platform==='win32'?'latexmk.exe':'/usr/bin/latexmk'});
+ const nativeLatexmk = process.platform==='win32'?'latexmk.exe':(process.platform==='darwin'&&!require('node:fs').existsSync('/usr/bin/latexmk')?'/Library/TeX/texbin/latexmk':'/usr/bin/latexmk');
+ await native.request({...options,sourceFiles:{[chapter]:broken},editId:'native-error',executable:nativeLatexmk});
  assert.equal(native.current,undefined);assert.equal(nativeIssues.at(-1).file,chapter);assert.equal(nativeIssues.at(-1).line,2);assert.equal(nativeIssues.at(-1).sourceHash,hash(broken));
  native.store.stage=async()=>{throw Error('PDF validation probe: invalid PDF');};
- await native.request({...options,sourceFiles:{[chapter]:'Repaired chapter.'},editId:'pdf-error',executable:process.platform==='win32'?'latexmk.exe':'/usr/bin/latexmk'});
+ await native.request({...options,sourceFiles:{[chapter]:'Repaired chapter.'},editId:'pdf-error',executable:nativeLatexmk});
  assert.equal(nativeIssues.at(-1).kind,'build');assert.equal(nativeIssues.at(-1).message,'PDF validation probe: invalid PDF');assert.equal(nativeIssues.at(-1).file,undefined);
 
 });
