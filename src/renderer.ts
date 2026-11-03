@@ -30,6 +30,7 @@ import type {BuildDiagnostic} from './diagnostics';
 import {diagnosticAdvice,diagnosticSuggestion,diagnosticRepair,DiagnosticTracker} from './diagnostics';
 import {recoveryLineBlocked,recoveryPointBlocked} from './recovery-navigation';
 import type {Navigation,Region} from './navigation';
+import {parseTeXBreakdown, formatBreakdownText, TeXCountBreakdown} from './texcount-parser';
 declare global {interface Window {desktop:{call:(method:string,...args:unknown[])=>Promise<any>;on:(callback:(message:any)=>void)=>void;platform?:string;};}}
 const api=window.desktop;
 const el=<T extends HTMLElement=HTMLElement>(id:string)=>document.getElementById(id) as T;
@@ -1166,6 +1167,7 @@ function createState(text:string){
     previewUpdating=!!model.onSave;renderIssue();
     refreshPreviewStatus();
     const doc=model.docs.find((d:any)=>d.path===active);if(doc){doc.text=update.state.doc.toString();doc.dirty=true;renderTabs();}
+    updateLiveWordCount(update.state.doc.toString());
     if(!editScheduled){editScheduled=true;queueMicrotask(()=>{editScheduled=false;void flush().catch(report);});}
   }
   if(update.selectionSet&&!update.docChanged&&model.followPreview&&!suppressFollow){cancelAnimationFrame(followFrame);followFrame=requestAnimationFrame(()=>void locateSource(false).catch(e=>{el('navState').textContent=String(e);}));}
@@ -1247,6 +1249,144 @@ function renderTabs(){
   el('rootLabel').textContent=model.root?'Root: '+model.root:'No root selected';
   renderRecoveryNotice();
 }
+
+let wordCountTimer = 0;
+let lastWordCountBreakdown: TeXCountBreakdown | undefined;
+
+function updateLiveWordCount(text: string): void {
+  window.clearTimeout(wordCountTimer);
+  wordCountTimer = window.setTimeout(() => {
+    try {
+      const breakdown = parseTeXBreakdown(text);
+      lastWordCountBreakdown = breakdown;
+      const wordCountEl = document.getElementById('statusBarWords');
+      if (wordCountEl) {
+        wordCountEl.textContent = `${breakdown.total.words.toLocaleString()} words`;
+      }
+    } catch {}
+  }, 100);
+}
+
+function renderWordCountTable(breakdown: TeXCountBreakdown, fileName?: string): void {
+  const fmt = (n: number) => n.toLocaleString();
+  const setNum = (id: string, num: number) => {
+    const node = document.getElementById(id);
+    if (node) node.textContent = fmt(num);
+  };
+  setNum('wcTotalWords', breakdown.total.words);
+  setNum('wcTotalChars', breakdown.total.characters);
+  setNum('wcMainWords', breakdown.mainText.words);
+  setNum('wcMainChars', breakdown.mainText.characters);
+  setNum('wcMainNoCiteWords', breakdown.mainTextWithoutCitations.words);
+  setNum('wcMainNoCiteChars', breakdown.mainTextWithoutCitations.characters);
+  setNum('wcHeadersWords', breakdown.headers.words);
+  setNum('wcHeadersChars', breakdown.headers.characters);
+  setNum('wcAbstractWords', breakdown.abstract.words);
+  setNum('wcAbstractChars', breakdown.abstract.characters);
+  setNum('wcCaptionsWords', breakdown.captions.words);
+  setNum('wcCaptionsChars', breakdown.captions.characters);
+  setNum('wcFootnotesWords', breakdown.footnotes.words);
+  setNum('wcFootnotesChars', breakdown.footnotes.characters);
+  setNum('wcOtherWords', breakdown.other.words);
+  setNum('wcOtherChars', breakdown.other.characters);
+
+  const wordCountEl = document.getElementById('statusBarWords');
+  if (wordCountEl) wordCountEl.textContent = `${fmt(breakdown.total.words)} words`;
+
+  if (fileName) {
+    const base = fileName.split(/[\\/]/).at(-1) || fileName;
+    const nameEl = document.getElementById('wcFileName');
+    if (nameEl) nameEl.textContent = `${base} · ${breakdown.source === 'texcount' ? 'TeXcount Engine' : 'Live Document Analysis'}`;
+  }
+  const engineEl = document.getElementById('wcSourceEngine');
+  if (engineEl) engineEl.textContent = breakdown.source === 'texcount' ? 'Powered by TeXcount engine' : 'Live AST document parser';
+}
+
+async function showWordCountModal(): Promise<void> {
+  const dialog = document.getElementById('wordCountDialog') as HTMLDialogElement | null;
+  if (!dialog) return;
+
+  const text = view ? view.state.doc.toString() : '';
+  const currentFile = active || model.root;
+
+  const instant = parseTeXBreakdown(text);
+  lastWordCountBreakdown = instant;
+  renderWordCountTable(instant, currentFile);
+
+  if (!dialog.open) dialog.showModal();
+
+  try {
+    const res = await api.call('wordCount', currentFile, text) as TeXCountBreakdown;
+    if (res) {
+      lastWordCountBreakdown = res;
+      renderWordCountTable(res, currentFile);
+    }
+  } catch {}
+}
+
+function initWordCountListeners(): void {
+  const wcDialog = document.getElementById('wordCountDialog') as HTMLDialogElement | null;
+  const closeWc = () => { if (wcDialog?.open) wcDialog.close(); };
+
+  const closeX = document.getElementById('closeWordCountX');
+  if (closeX) closeX.onclick = closeWc;
+
+  const closeBtn = document.getElementById('closeWordCountBtn');
+  if (closeBtn) closeBtn.onclick = closeWc;
+
+  const statusBtn = document.getElementById('statusBarWordCount');
+  if (statusBtn) statusBtn.onclick = () => void showWordCountModal();
+
+  const toolbarWc = document.getElementById('wordCountBtn');
+  if (toolbarWc) toolbarWc.onclick = () => void showWordCountModal();
+
+  const refreshBtn = document.getElementById('refreshWordCountBtn');
+  if (refreshBtn) {
+    refreshBtn.onclick = async () => {
+      const text = view ? view.state.doc.toString() : '';
+      const currentFile = active || model.root;
+      const instant = parseTeXBreakdown(text);
+      lastWordCountBreakdown = instant;
+      renderWordCountTable(instant, currentFile);
+      try {
+        const res = await api.call('wordCount', currentFile, text) as TeXCountBreakdown;
+        if (res) {
+          lastWordCountBreakdown = res;
+          renderWordCountTable(res, currentFile);
+        }
+      } catch {}
+    };
+  }
+
+  const copyBtn = document.getElementById('copyWordCountBtn');
+  if (copyBtn) {
+    copyBtn.onclick = async () => {
+      if (!lastWordCountBreakdown) {
+        const text = view ? view.state.doc.toString() : '';
+        lastWordCountBreakdown = parseTeXBreakdown(text);
+      }
+      const formatted = formatBreakdownText(lastWordCountBreakdown);
+      await navigator.clipboard.writeText(formatted);
+      const copyLabel = document.getElementById('copyWordCountLabel');
+      if (copyLabel) {
+        copyLabel.textContent = 'Copied to clipboard!';
+        setTimeout(() => {
+          copyLabel.textContent = 'Copy to clipboard';
+        }, 1800);
+      }
+    };
+  }
+
+  if (wcDialog) {
+    wcDialog.addEventListener('click', (e) => {
+      const rect = wcDialog.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+        wcDialog.close();
+      }
+    });
+  }
+}
+
 function renderEditor(){
   cancelSurround();endPreview();
   const next=model.active;
@@ -1265,6 +1405,7 @@ function renderEditor(){
     if(view){view.destroy();view=undefined;}
     el('welcome').hidden=false;
   }
+  updateLiveWordCount(doc ? doc.text : '');
   renderTabs();renderIssue();
 }
 async function command(action:()=>Promise<unknown>){try{await action();if(operationIssue){operationIssue=undefined;renderRecoveryNotice();}}catch(e){report(e);}}
@@ -2467,6 +2608,7 @@ function initOutlineResizer() {
 }
 initSidebarResizer();
 initOutlineResizer();
+initWordCountListeners();
 model=await api.call('initialize');
 applyTheme(model.theme||'auto',!!model.pdfInvert);
 projectSidebar.update(model);

@@ -27,6 +27,7 @@ import {generateInstalledFormat,fingerprintFiles} from './format-cache';
 import {formatFingerprint,FORMAT_FINGERPRINT_POLICY} from './format-fingerprint';
 import {probe} from './toolchain';
 import {standaloneTex,previewRootForDocument} from './document-root';
+import {computeWordCount} from './texcount';
 
 interface Doc {path:string;text:string;diskHash:string;dirty:boolean;eol:string;}
 interface State {theme?:'auto'|'dark'|'midnight'|'nord'|'monokai'|'overleaf'|'overleaf-dark'|'light'|'warm';pdfInvert?:boolean;projectFolder?:string;previewMode?:'lecture'|'document';documentRoots?:Record<string,string>;texBin?:string;toolchainSeen?:boolean;projectSidebar?:boolean;docs:Doc[];active:string;root:string;engine:string;latexmk:string;onSave:boolean;backups?:boolean;liveVersion?:number;supportFolders?:string[];zoom?:number|'fit-width';statusBar?:boolean;panelLayout?:PanelPreferences;autoClose?:boolean;followPreview?:boolean;previewEditing?:boolean;continuousPreview?:boolean;lastCursor?:{file:string;at:number};}
@@ -414,6 +415,17 @@ async function handle(method:string,args:unknown[]) {
       // Activation belongs to the renderer after it accepts this asynchronous
       // response; a superseded click must not change the active source file.
       return {state:{...state,active:file},line:lineNumber};
+    }
+    case 'wordCount': {
+      const targetPath = typeof args[0] === 'string' && args[0].trim() ? args[0] : (state.active || state.root);
+      const activeDoc = state.docs.find(d => d.path === targetPath);
+      let content = typeof args[1] === 'string' ? args[1] : (activeDoc?.text ?? '');
+      if (!content && targetPath) {
+        try {
+          content = await fs.readFile(targetPath, 'utf-8');
+        } catch {}
+      }
+      return computeWordCount(content, targetPath);
     }
     case 'initialize': {
       void runBackup();

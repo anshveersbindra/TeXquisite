@@ -31,7 +31,8 @@ const paths: Record<string, string> = {
   pages: 'M6 3h13v15H6z M3 7v14h13',
   zoom: 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14 M15 15l7 7 M7 10h6M10 7v6',
   theme: 'M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26 5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z',
-  pdfInvert: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16v16z'
+  pdfInvert: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16v16z',
+  wordCount: 'M4 19.5A2.5 2.5 0 0 1 6.5 17H20 M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z M9 7h6 M9 11h6 M9 15h4'
 };
 
 function svg(name: string, strokeColor = 'currentColor') {
@@ -122,6 +123,7 @@ export function installToolbar() {
     ['locate', 'locate', 'Show source cursor in PDF (Ctrl+Enter)'],
     ['follow', 'follow', 'Follow typing in the preview'],
     ['toggleStatus', 'status', 'Status Bar: Show or hide preview status and timing details'],
+    ['wordCountBtn', 'wordCount', 'Word Count & Statistics: Detailed TeXcount document analysis'],
     ['toggleProblems', 'problems', 'Problems: View LaTeX compiler diagnostics and error list'],
     ['toggleLog', 'terminal', 'Build Log: View full raw compiler output and transcript'],
     ['settings', 'settings', 'Preferences: Configure themes, editor fonts, TeX engine, and backups (⌘,)']

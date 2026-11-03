@@ -71,19 +71,38 @@ export class ProjectSidebar {
     }
 
     // Drag-and-drop file import from Finder / Explorer
+    const clearAllDrags = () => this.clearDragState();
+    window.addEventListener('dragend', clearAllDrags);
+    window.addEventListener('drop', clearAllDrags);
+    window.addEventListener('dragleave', (e: DragEvent) => {
+      if (e.clientX <= 0 || e.clientY <= 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight || !e.relatedTarget) {
+        clearAllDrags();
+      }
+    });
+
+    let hostDragDepth = 0;
+    this.host.addEventListener('dragenter', (e: DragEvent) => {
+      e.preventDefault();
+      hostDragDepth++;
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      this.host.classList.add('drag-over');
+    });
     this.host.addEventListener('dragover', (e: DragEvent) => {
       e.preventDefault();
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
       this.host.classList.add('drag-over');
     });
     this.host.addEventListener('dragleave', (e: DragEvent) => {
-      if (!this.host.contains(e.relatedTarget as Node)) {
+      hostDragDepth--;
+      if (hostDragDepth <= 0 || !this.host.contains(e.relatedTarget as Node)) {
+        hostDragDepth = 0;
         this.host.classList.remove('drag-over');
       }
     });
     this.host.addEventListener('drop', async (e: DragEvent) => {
       e.preventDefault();
-      this.host.classList.remove('drag-over');
+      hostDragDepth = 0;
+      this.clearDragState();
       const files = Array.from(e.dataTransfer?.files ?? []);
       const desktop = (window as any).desktop;
       const filePaths: string[] = [];
@@ -120,6 +139,13 @@ export class ProjectSidebar {
         this.filterTimer = window.setTimeout(() => void this.refresh(), 200);
       };
     }
+  }
+
+  private clearDragState(): void {
+    this.host.classList.remove('drag-over');
+    document.querySelectorAll('.drag-over, .drag-hover').forEach(el => {
+      el.classList.remove('drag-over', 'drag-hover');
+    });
   }
 
   private getActiveFolder(): string {
@@ -361,15 +387,11 @@ export class ProjectSidebar {
       button.dataset.outlineAt = String(node.item.at);
       button.title = `${node.item.label} (line ${node.item.line})`;
 
-      const badge = document.createElement('span');
-      badge.className = 'outline-level-badge';
-      badge.textContent = levelNames[node.item.level] ?? 'Sec';
-
       const label = document.createElement('span');
       label.className = 'outline-label';
       label.textContent = node.item.label;
 
-      button.append(badge, label);
+      button.append(label);
       button.onclick = () => this.jump(file, text, node.item.at);
       row.append(button);
       nodeEl.append(row);
@@ -425,9 +447,18 @@ export class ProjectSidebar {
 
         const summaryLabel = document.createElement('span');
         summaryLabel.className = 'tree-label';
-        summaryLabel.append(createSvg('folder', 14), ' ' + (isMain ? folderName : 'Support: ' + folderName));
+        summaryLabel.append(createSvg('folder', 14), ' ' + folderName);
         summary.append(summaryLabel);
         summary.title = folder;
+
+        let summaryDepth = 0;
+        summary.ondragenter = (e: DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          summaryDepth++;
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+          summary.classList.add('drag-hover');
+        };
         summary.ondragover = (e: DragEvent) => {
           e.preventDefault();
           e.stopPropagation();
@@ -435,14 +466,18 @@ export class ProjectSidebar {
           summary.classList.add('drag-hover');
         };
         summary.ondragleave = (e: DragEvent) => {
-          if (!summary.contains(e.relatedTarget as Node)) {
+          e.stopPropagation();
+          summaryDepth--;
+          if (summaryDepth <= 0 || !summary.contains(e.relatedTarget as Node)) {
+            summaryDepth = 0;
             summary.classList.remove('drag-hover');
           }
         };
         summary.ondrop = async (e: DragEvent) => {
           e.preventDefault();
           e.stopPropagation();
-          summary.classList.remove('drag-hover');
+          summaryDepth = 0;
+          this.clearDragState();
           const internal = e.dataTransfer?.getData('application/x-texquisite-path') || e.dataTransfer?.getData('text/plain');
           if (internal && internal !== folder) {
             try {
@@ -540,6 +575,15 @@ export class ProjectSidebar {
           label.textContent = entry.name;
 
           summary.append(icon, label);
+
+          let subSummaryDepth = 0;
+          summary.ondragenter = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            subSummaryDepth++;
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+            summary.classList.add('drag-hover');
+          };
           summary.ondragover = (e: DragEvent) => {
             e.preventDefault();
             e.stopPropagation();
@@ -547,14 +591,18 @@ export class ProjectSidebar {
             summary.classList.add('drag-hover');
           };
           summary.ondragleave = (e: DragEvent) => {
-            if (!summary.contains(e.relatedTarget as Node)) {
+            e.stopPropagation();
+            subSummaryDepth--;
+            if (subSummaryDepth <= 0 || !summary.contains(e.relatedTarget as Node)) {
+              subSummaryDepth = 0;
               summary.classList.remove('drag-hover');
             }
           };
           summary.ondrop = async (e: DragEvent) => {
             e.preventDefault();
             e.stopPropagation();
-            summary.classList.remove('drag-hover');
+            subSummaryDepth = 0;
+            this.clearDragState();
             const internal = e.dataTransfer?.getData('application/x-texquisite-path') || e.dataTransfer?.getData('text/plain');
             if (internal && internal !== entry.path) {
               try {

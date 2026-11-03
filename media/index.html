@@ -43,6 +43,7 @@
     <!-- Group: Diagnostics & Settings -->
     <div class="toolbar-group">
       <button id="toggleStatus" class="toolbar-icon-btn" aria-pressed="true" title="Toggle status bar">Status</button>
+      <button id="wordCountBtn" class="toolbar-icon-btn" title="Detailed Word Count &amp; Character Statistics (TeXcount breakdown)">Words</button>
       <button id="toggleProblems" class="toolbar-icon-btn" title="Project problems">Problems</button>
       <button id="toggleLog" class="toolbar-icon-btn" title="View build log">Log</button>
       <button id="settings" class="toolbar-icon-btn" title="Preferences (Cmd+,)">Settings</button>
@@ -129,7 +130,7 @@
       <div class="pane-title">
         <span>SOURCE</span>
         <button id="autoClose" aria-pressed="true" title="Match delimiters, wrap selections and synchronize environment names; type a generated closer to move past it">Match pairs: on</button>
-        <button id="support">Support files…</button>
+        <button id="support" hidden style="display:none">Support files…</button>
         <button id="root">Use active file as root</button>
       </div>
       <nav id="tabs" aria-label="Open files"></nav>
@@ -305,11 +306,97 @@
     </div>
   </aside>
   <div id="statusDetails">
+    <button id="statusBarWordCount" type="button" class="status-pill-btn" title="Detailed Document Word &amp; Character Count (TeXcount breakdown)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+      <span id="statusBarWords">0 words</span>
+    </button>
     <span id="status" role="status">Open a LaTeX document to begin.</span>
     <span id="previewState" role="status">Automatic preview</span>
     <span id="navState" role="status">Click PDF text to show its source</span>
   </div>
 </footer>
+
+<!-- Detailed Word Count Dialog (TeXcount breakdown) -->
+<dialog id="wordCountDialog" class="app-dialog">
+  <div class="word-count-modal">
+    <div class="wc-header">
+      <div class="wc-title-wrap">
+        <h2>Document Statistics</h2>
+        <span class="wc-subtitle" id="wcFileName">TeXcount Breakdown</span>
+      </div>
+      <button id="closeWordCountX" type="button" class="close-x" aria-label="Close dialog">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="wc-body">
+      <table class="wc-table">
+        <thead>
+          <tr>
+            <th class="wc-th-category">Section / Component</th>
+            <th class="wc-th-num">Words</th>
+            <th class="wc-th-num">Characters</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="wc-row-total">
+            <td class="wc-td-label"><strong>Total words:</strong></td>
+            <td class="wc-td-num" id="wcTotalWords">0</td>
+            <td class="wc-td-num" id="wcTotalChars">0</td>
+          </tr>
+          <tr class="wc-row-main">
+            <td class="wc-td-label"><strong>Main text:</strong></td>
+            <td class="wc-td-num" id="wcMainWords">0</td>
+            <td class="wc-td-num" id="wcMainChars">0</td>
+          </tr>
+          <tr class="wc-row-sub">
+            <td class="wc-td-label wc-indent"><em>without in-text citations:</em></td>
+            <td class="wc-td-num" id="wcMainNoCiteWords">0</td>
+            <td class="wc-td-num" id="wcMainNoCiteChars">0</td>
+          </tr>
+          <tr class="wc-row-item">
+            <td class="wc-td-label"><strong>Headers:</strong></td>
+            <td class="wc-td-num" id="wcHeadersWords">0</td>
+            <td class="wc-td-num" id="wcHeadersChars">0</td>
+          </tr>
+          <tr class="wc-row-item">
+            <td class="wc-td-label"><strong>Abstract:</strong></td>
+            <td class="wc-td-num" id="wcAbstractWords">0</td>
+            <td class="wc-td-num" id="wcAbstractChars">0</td>
+          </tr>
+          <tr class="wc-row-item">
+            <td class="wc-td-label"><strong>Captions:</strong></td>
+            <td class="wc-td-num" id="wcCaptionsWords">0</td>
+            <td class="wc-td-num" id="wcCaptionsChars">0</td>
+          </tr>
+          <tr class="wc-row-item">
+            <td class="wc-td-label"><strong>Footnotes:</strong></td>
+            <td class="wc-td-num" id="wcFootnotesWords">0</td>
+            <td class="wc-td-num" id="wcFootnotesChars">0</td>
+          </tr>
+          <tr class="wc-row-item">
+            <td class="wc-td-label"><strong>Other:</strong></td>
+            <td class="wc-td-num" id="wcOtherWords">0</td>
+            <td class="wc-td-num" id="wcOtherChars">0</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="wc-footer">
+      <div class="wc-footer-source" id="wcSourceEngine">TeXcount engine breakdown</div>
+      <div class="wc-footer-actions">
+        <button type="button" id="copyWordCountBtn" class="wc-btn-secondary" title="Copy exact breakdown table to clipboard">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          <span id="copyWordCountLabel">Copy to clipboard</span>
+        </button>
+        <button type="button" id="refreshWordCountBtn" class="wc-btn-secondary" title="Recalculate counts from current editor buffer">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+          <span>Refresh</span>
+        </button>
+        <button type="button" id="closeWordCountBtn" class="wc-btn-primary">Close</button>
+      </div>
+    </div>
+  </div>
+</dialog>
 
 <!-- Expanded Preferences Dialog -->
 <dialog id="settingsDialog">
