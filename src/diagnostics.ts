@@ -62,9 +62,9 @@ export function parseDiagnostic(text:string,inputs:DiagnosticInput[]=[]):Pick<Bu
   const fatalErr = /^(?:!\s*)?(Emergency stop|Fatal error occurred.*|.*no output PDF file produced.*)$/mi.exec(text);
   if (fatalErr) return {kind:'tex', message: compact(fatalErr[1])};
 
-  const isBanner = (line: string) => /^(?:This is (?:pdfTeX|XeTeX|Lua|TeX|BibTeX|Latexmk|METAFONT)|Rc files read:|Latexmk: This is|entering extended mode|LaTeX2e <|L3 programming layer <|Document Class:|Rule ['"]|Category ['"]|Running ['"]|Run number \d|Latexmk: [Aa]pplying rule|Latexmk: [Gg]etting log|Latexmk: [Ee]xamining|Latexmk: [Aa]ll targets|Output written on|SyncTeX written on|Transcript written on|\*\*\* \(job aborted\)|===+|Collected error summary|\s*Refer to '|\s*pdflatex: Command)/i.test(line.trim());
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l && !isBanner(l));
-  const errorLine = lines.find(l => /error|fatal|fail|emergency|undefined/i.test(l)) ?? lines[0];
+  const isBanner = (line: string) => /^(?:This is (?:pdfTeX|XeTeX|Lua|TeX|BibTeX|Latexmk|METAFONT)|Rc files read:|Latexmk:|entering extended mode|file:line:error style messages enabled|LaTeX2e <|L3 programming layer <|Document Class:|Rule ['"]|Category ['"]|Running ['"]|Run number \d|Output written on|SyncTeX written on|Transcript written on|\*\*\* \(job aborted\)|===+|Collected error summary|\s*Refer to '|\s*pdflatex: Command|\(see the transcript file for additional information\)|no (?:dictionary|output PDF file produced)|[0-9]+ words?|[0-9]+ characters?)/i.test(line.trim());
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l && !isBanner(l) && !l.includes('file:line:error style messages enabled'));
+  const errorLine = lines.find(l => !/file:line:error/i.test(l) && /error|fatal|fail|emergency|undefined/i.test(l)) ?? lines.find(l => !/file:line:error/i.test(l)) ?? lines[0];
   return {kind:'build',message:compact(errorLine ?? 'Compilation did not finish. Open the build log for details.')};
 }
 function compact(text:string){return text.replace(/^Error:\s*/,'').replace(/\s+/g,' ').trim().slice(0,300);}

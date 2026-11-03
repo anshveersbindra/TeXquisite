@@ -23,7 +23,7 @@ export {
 /**
  * Runs texcount CLI with input text over stdin and returns text, header, and caption counts.
  */
-function runTexcountCli(bin: string, input: string, cwd?: string): Promise<{ text: number; headers: number; captions: number }> {
+function runTexcountCli(bin: string, input: string, cwd?: string): Promise<{ text: number; headers: number; captions: number; inlineMath: number; displayMath: number }> {
   return new Promise((resolve, reject) => {
     const args = ['-template={1}:{2}:{3}:{4}:{5}:{6}:{7}', '-merge', '-inc', '-'];
     const child = execFile(bin, args, { cwd, timeout: 5000 }, (error, stdout) => {
@@ -33,6 +33,8 @@ function runTexcountCli(bin: string, input: string, cwd?: string): Promise<{ tex
         text: parts[0] || 0,
         headers: parts[1] || 0,
         captions: parts[2] || 0,
+        inlineMath: parts[5] || 0,
+        displayMath: parts[6] || 0,
       });
     });
     if (child.stdin) {
@@ -66,6 +68,8 @@ export async function computeWordCount(text: string, filePath?: string): Promise
         fallback.headers.words = withCites.headers;
         fallback.captions.words = withCites.captions;
         fallback.mainTextWithoutCitations.words = withoutCites.text;
+        if (withCites.inlineMath !== undefined) fallback.inlineMath = withCites.inlineMath;
+        if (withCites.displayMath !== undefined) fallback.displayMath = withCites.displayMath;
         fallback.total.words =
           fallback.mainText.words +
           fallback.headers.words +

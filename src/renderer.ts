@@ -1267,6 +1267,63 @@ function updateLiveWordCount(text: string): void {
   }, 100);
 }
 
+function recalculateSelectedCount(breakdown?: TeXCountBreakdown): void {
+  const data = breakdown || lastWordCountBreakdown;
+  if (!data) return;
+
+  const fmt = (n: number) => n.toLocaleString();
+  const isChecked = (comp: string): boolean => {
+    const el = document.querySelector<HTMLInputElement>(`.wc-comp-checkbox[data-component="${comp}"]`);
+    return el ? el.checked : false;
+  };
+  const excludeCites = (document.getElementById('wcExcludeCitationsCheck') as HTMLInputElement | null)?.checked ?? false;
+
+  let words = 0;
+  let chars = 0;
+
+  if (isChecked('mainText')) {
+    if (excludeCites) {
+      words += data.mainTextWithoutCitations.words;
+      chars += data.mainTextWithoutCitations.characters;
+    } else {
+      words += data.mainText.words;
+      chars += data.mainText.characters;
+    }
+  }
+  if (isChecked('headers')) {
+    words += data.headers.words;
+    chars += data.headers.characters;
+  }
+  if (isChecked('abstract')) {
+    words += data.abstract.words;
+    chars += data.abstract.characters;
+  }
+  if (isChecked('captions')) {
+    words += data.captions.words;
+    chars += data.captions.characters;
+  }
+  if (isChecked('footnotes')) {
+    words += data.footnotes.words;
+    chars += data.footnotes.characters;
+  }
+  if (isChecked('other')) {
+    words += data.other.words;
+    chars += data.other.characters;
+  }
+
+  const counterWordsEl = document.getElementById('wcCounterWords');
+  if (counterWordsEl) counterWordsEl.textContent = fmt(words);
+
+  const counterCharsEl = document.getElementById('wcCounterChars');
+  if (counterCharsEl) counterCharsEl.textContent = fmt(chars);
+
+  const syncToggle = document.getElementById('wcSyncToStatusBar') as HTMLInputElement | null;
+  if (syncToggle?.checked) {
+    const wordCountEl = document.getElementById('statusBarWords');
+    if (wordCountEl) wordCountEl.textContent = `${fmt(words)} words`;
+  }
+}
+
 function renderWordCountTable(breakdown: TeXCountBreakdown, fileName?: string): void {
   const fmt = (n: number) => n.toLocaleString();
   const setNum = (id: string, num: number) => {
@@ -1290,8 +1347,20 @@ function renderWordCountTable(breakdown: TeXCountBreakdown, fileName?: string): 
   setNum('wcOtherWords', breakdown.other.words);
   setNum('wcOtherChars', breakdown.other.characters);
 
+  // Math counts (display and inline math)
+  const inline = breakdown.inlineMath || 0;
+  const display = breakdown.displayMath || 0;
+  setNum('wcMathInline', inline);
+  setNum('wcMathDisplay', display);
+  setNum('wcMathTotal', inline + display);
+
+  recalculateSelectedCount(breakdown);
+
   const wordCountEl = document.getElementById('statusBarWords');
-  if (wordCountEl) wordCountEl.textContent = `${fmt(breakdown.total.words)} words`;
+  const syncToggle = document.getElementById('wcSyncToStatusBar') as HTMLInputElement | null;
+  if (wordCountEl && (!syncToggle || !syncToggle.checked)) {
+    wordCountEl.textContent = `${fmt(breakdown.total.words)} words`;
+  }
 
   if (fileName) {
     const base = fileName.split(/[\\/]/).at(-1) || fileName;
@@ -1358,6 +1427,39 @@ function initWordCountListeners(): void {
     };
   }
 
+  // Interactive component checkboxes
+  const compCheckboxes = document.querySelectorAll<HTMLInputElement>('.wc-comp-checkbox');
+  compCheckboxes.forEach(cb => {
+    cb.addEventListener('change', () => recalculateSelectedCount());
+  });
+
+  const noCiteCheck = document.getElementById('wcExcludeCitationsCheck') as HTMLInputElement | null;
+  if (noCiteCheck) {
+    noCiteCheck.addEventListener('change', () => recalculateSelectedCount());
+  }
+
+  const selectAll = document.getElementById('wcSelectAllComponents') as HTMLInputElement | null;
+  if (selectAll) {
+    selectAll.addEventListener('change', () => {
+      compCheckboxes.forEach(cb => { cb.checked = selectAll.checked; });
+      recalculateSelectedCount();
+    });
+  }
+
+  const syncToggle = document.getElementById('wcSyncToStatusBar') as HTMLInputElement | null;
+  if (syncToggle) {
+    syncToggle.addEventListener('change', () => {
+      if (lastWordCountBreakdown) {
+        if (syncToggle.checked) {
+          recalculateSelectedCount();
+        } else {
+          const statusBarWords = document.getElementById('statusBarWords');
+          if (statusBarWords) statusBarWords.textContent = `${lastWordCountBreakdown.total.words.toLocaleString()} words`;
+        }
+      }
+    });
+  }
+
   const copyBtn = document.getElementById('copyWordCountBtn');
   if (copyBtn) {
     copyBtn.onclick = async () => {
@@ -1366,10 +1468,20 @@ function initWordCountListeners(): void {
         lastWordCountBreakdown = parseTeXBreakdown(text);
       }
       const formatted = formatBreakdownText(lastWordCountBreakdown);
-      await navigator.clipboard.writeText(formatted);
+      let copied = false;
+      try {
+        await api.call('writeClipboard', formatted);
+        copied = true;
+      } catch {}
+      if (!copied) {
+        try {
+          await navigator.clipboard.writeText(formatted);
+          copied = true;
+        } catch {}
+      }
       const copyLabel = document.getElementById('copyWordCountLabel');
       if (copyLabel) {
-        copyLabel.textContent = 'Copied to clipboard!';
+        copyLabel.textContent = copied ? 'Copied to clipboard!' : 'Failed to copy';
         setTimeout(() => {
           copyLabel.textContent = 'Copy to clipboard';
         }, 1800);

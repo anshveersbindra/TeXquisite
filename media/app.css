@@ -2868,6 +2868,26 @@ dialog::backdrop {
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
 }
+#wordCountDialog {
+  width: 580px;
+  max-width: 94vw;
+  border-radius: 14px;
+  border: 1px solid var(--dialog-border);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.38), 0 4px 16px rgba(0, 0, 0, 0.15);
+  animation: dialogPop 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes dialogPop {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
 .word-count-modal {
   display: flex;
   flex-direction: column;
@@ -2876,13 +2896,13 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 16px 20px 14px;
+  padding: 16px 22px 14px;
   border-bottom: 1px solid var(--border-pane);
   background: var(--bg-pane);
 }
 .wc-title-wrap h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   letter-spacing: -0.01em;
 }
@@ -2892,8 +2912,80 @@ dialog::backdrop {
   margin-top: 2px;
   display: block;
 }
+.wc-counter-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  background: var(--bg-pane);
+  border-bottom: 1px solid var(--border-pane);
+  gap: 16px;
+}
+.wc-counter-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wc-counter-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  color: var(--text-pane-label);
+}
+.wc-counter-values {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-mono);
+}
+.wc-counter-words {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand-primary, #3b82f6);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.wc-counter-chars {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-app);
+}
+.wc-counter-unit {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-pane-label);
+  margin-right: 4px;
+}
+.wc-counter-divider {
+  color: var(--border-pane);
+  font-size: 16px;
+}
+.wc-counter-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11.5px;
+  color: var(--text-pane-label);
+  cursor: pointer;
+  user-select: none;
+  background: var(--btn-hover);
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border-pane);
+  transition: all 0.15s ease;
+}
+.wc-counter-toggle:hover {
+  background: var(--btn-active-bg, var(--btn-hover));
+  color: var(--text-app);
+}
+.wc-counter-toggle input[type="checkbox"] {
+  accent-color: var(--brand-primary, #3b82f6);
+  cursor: pointer;
+  margin: 0;
+}
 .wc-body {
-  padding: 16px 20px;
+  padding: 12px 22px 16px;
   background: var(--bg-surface);
   overflow-y: auto;
   max-height: 60vh;
@@ -2906,21 +2998,24 @@ dialog::backdrop {
 }
 .wc-table th {
   text-align: left;
-  padding: 8px 12px;
-  font-size: 11px;
+  padding: 8px 10px;
+  font-size: 10.5px;
   font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--text-pane-label);
   border-bottom: 1px solid var(--border-pane);
 }
 .wc-table .wc-th-num {
   text-align: right;
-  width: 100px;
+  width: 95px;
 }
 .wc-table td {
-  padding: 7px 12px;
-  border-bottom: 1px solid var(--border-subtle, rgba(125, 125, 125, 0.12));
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-subtle, rgba(125, 125, 125, 0.1));
+}
+.wc-table tr:hover td {
+  background: rgba(125, 125, 125, 0.04);
 }
 .wc-table .wc-td-num {
   text-align: right;
@@ -2933,7 +3028,7 @@ dialog::backdrop {
 }
 .wc-row-total td {
   border-bottom: 1.5px solid var(--border-pane);
-  padding: 9px 12px;
+  padding: 9px 10px;
 }
 .wc-row-total strong {
   font-weight: 600;
@@ -2949,6 +3044,53 @@ dialog::backdrop {
   padding-left: 28px !important;
   color: var(--text-pane-label);
   font-size: 11.5px;
+}
+.wc-th-check, .wc-td-check {
+  width: 28px;
+  text-align: center;
+  padding: 7px 4px !important;
+}
+.wc-th-check input[type="checkbox"],
+.wc-td-check input[type="checkbox"],
+.wc-sub-checkbox {
+  accent-color: var(--brand-primary, #3b82f6);
+  cursor: pointer;
+  margin: 0;
+  vertical-align: middle;
+}
+.wc-row-section-header td {
+  background: var(--bg-pane);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-pane-label);
+  padding: 10px 10px 6px;
+  border-top: 1px solid var(--border-pane);
+  border-bottom: 1px solid var(--border-pane);
+}
+.wc-row-math td {
+  padding: 7px 10px;
+}
+.wc-row-math-total {
+  background: var(--bg-subtle, rgba(125, 125, 125, 0.04));
+}
+.wc-row-math-total td {
+  border-top: 1px solid var(--border-pane);
+  padding: 8px 10px;
+}
+.wc-td-unit {
+  color: var(--text-pane-label);
+  font-size: 11.5px;
+  font-family: inherit;
+  text-align: right;
+}
+.wc-code {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-pane);
+  border: 1px solid var(--border-subtle, rgba(125, 125, 125, 0.15));
 }
 .wc-footer {
   display: flex;

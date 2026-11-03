@@ -12,6 +12,8 @@ export interface TeXCountBreakdown {
   captions: TeXCountItem;
   footnotes: TeXCountItem;
   other: TeXCountItem;
+  inlineMath: number;
+  displayMath: number;
   source: 'texcount' | 'internal';
 }
 
@@ -105,6 +107,33 @@ export function parseTeXBreakdown(rawText: string): TeXCountBreakdown {
     body = docEndIdx !== -1 ? afterBegin.slice(0, docEndIdx) : afterBegin;
   }
 
+  // 0. Math expressions count (display and inline)
+  let displayMathCount = 0;
+  const displayMathRegexes = [
+    /\$\$[\s\S]*?\$\$/g,
+    /(?<!\\)\\\[[\s\S]*?(?<!\\)\\\]/g,
+    /\\begin\{(?:equation|align|gather|multline|displaymath|flalign)\*?\}[\s\S]*?\\end\{(?:equation|align|gather|multline|displaymath|flalign)\*?\}/g,
+  ];
+  let mathScan = body;
+  for (const r of displayMathRegexes) {
+    mathScan = mathScan.replace(r, () => {
+      displayMathCount++;
+      return ' ';
+    });
+  }
+
+  let inlineMathCount = 0;
+  const inlineMathRegexes = [
+    /(?<!\\)\$[^$\n]+(?<!\\)\$/g,
+    /(?<!\\)\\\([\s\S]*?(?<!\\)\\\)/g,
+  ];
+  for (const r of inlineMathRegexes) {
+    mathScan = mathScan.replace(r, () => {
+      inlineMathCount++;
+      return ' ';
+    });
+  }
+
   // 1. Other (title, author, date, thanks from preamble or body)
   const otherParts: string[] = [];
   const metaRegex = /\\(?:title|author|date|thanks)\s*\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}/g;
@@ -186,6 +215,8 @@ export function parseTeXBreakdown(rawText: string): TeXCountBreakdown {
     captions: captionsStats,
     footnotes: footnotesStats,
     other: otherStats,
+    inlineMath: inlineMathCount,
+    displayMath: displayMathCount,
     source: 'internal',
   };
 }
@@ -211,5 +242,7 @@ export function formatBreakdownText(breakdown: TeXCountBreakdown): string {
     `${fmt(breakdown.footnotes.words)}\t${fmt(breakdown.footnotes.characters)}`,
     `Other:`,
     `${fmt(breakdown.other.words)}\t${fmt(breakdown.other.characters)}`,
+    `Math inline:\t${fmt(breakdown.inlineMath || 0)} formulae`,
+    `Math displayed:\t${fmt(breakdown.displayMath || 0)} formulae`,
   ].join('\n');
 }

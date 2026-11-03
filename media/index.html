@@ -328,10 +328,32 @@
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
       </button>
     </div>
+
+    <!-- Active Selection Counter with Live Toggles -->
+    <div class="wc-counter-banner">
+      <div class="wc-counter-box">
+        <span class="wc-counter-label">Selected Count</span>
+        <div class="wc-counter-values">
+          <span class="wc-counter-words" id="wcCounterWords">0</span>
+          <span class="wc-counter-unit">words</span>
+          <span class="wc-counter-divider">·</span>
+          <span class="wc-counter-chars" id="wcCounterChars">0</span>
+          <span class="wc-counter-unit">characters</span>
+        </div>
+      </div>
+      <label class="wc-counter-toggle" title="Sync this selection with the bottom status bar">
+        <input type="checkbox" id="wcSyncToStatusBar" checked>
+        <span>Pin to status bar</span>
+      </label>
+    </div>
+
     <div class="wc-body">
       <table class="wc-table">
         <thead>
           <tr>
+            <th class="wc-th-check">
+              <input type="checkbox" id="wcSelectAllComponents" title="Toggle all components" checked>
+            </th>
             <th class="wc-th-category">Section / Component</th>
             <th class="wc-th-num">Words</th>
             <th class="wc-th-num">Characters</th>
@@ -339,44 +361,89 @@
         </thead>
         <tbody>
           <tr class="wc-row-total">
+            <td class="wc-td-check"></td>
             <td class="wc-td-label"><strong>Total words:</strong></td>
             <td class="wc-td-num" id="wcTotalWords">0</td>
             <td class="wc-td-num" id="wcTotalChars">0</td>
           </tr>
           <tr class="wc-row-main">
+            <td class="wc-td-check">
+              <input type="checkbox" class="wc-comp-checkbox" data-component="mainText" checked title="Include Main text in selected count">
+            </td>
             <td class="wc-td-label"><strong>Main text:</strong></td>
             <td class="wc-td-num" id="wcMainWords">0</td>
             <td class="wc-td-num" id="wcMainChars">0</td>
           </tr>
           <tr class="wc-row-sub">
+            <td class="wc-td-check">
+              <input type="checkbox" class="wc-sub-checkbox" id="wcExcludeCitationsCheck" title="Exclude in-text citations from selected count">
+            </td>
             <td class="wc-td-label wc-indent"><em>without in-text citations:</em></td>
             <td class="wc-td-num" id="wcMainNoCiteWords">0</td>
             <td class="wc-td-num" id="wcMainNoCiteChars">0</td>
           </tr>
           <tr class="wc-row-item">
+            <td class="wc-td-check">
+              <input type="checkbox" class="wc-comp-checkbox" data-component="headers" checked title="Include Headers in selected count">
+            </td>
             <td class="wc-td-label"><strong>Headers:</strong></td>
             <td class="wc-td-num" id="wcHeadersWords">0</td>
             <td class="wc-td-num" id="wcHeadersChars">0</td>
           </tr>
           <tr class="wc-row-item">
+            <td class="wc-td-check">
+              <input type="checkbox" class="wc-comp-checkbox" data-component="abstract" checked title="Include Abstract in selected count">
+            </td>
             <td class="wc-td-label"><strong>Abstract:</strong></td>
             <td class="wc-td-num" id="wcAbstractWords">0</td>
             <td class="wc-td-num" id="wcAbstractChars">0</td>
           </tr>
           <tr class="wc-row-item">
+            <td class="wc-td-check">
+              <input type="checkbox" class="wc-comp-checkbox" data-component="captions" checked title="Include Captions in selected count">
+            </td>
             <td class="wc-td-label"><strong>Captions:</strong></td>
             <td class="wc-td-num" id="wcCaptionsWords">0</td>
             <td class="wc-td-num" id="wcCaptionsChars">0</td>
           </tr>
           <tr class="wc-row-item">
+            <td class="wc-td-check">
+              <input type="checkbox" class="wc-comp-checkbox" data-component="footnotes" title="Include Footnotes in selected count">
+            </td>
             <td class="wc-td-label"><strong>Footnotes:</strong></td>
             <td class="wc-td-num" id="wcFootnotesWords">0</td>
             <td class="wc-td-num" id="wcFootnotesChars">0</td>
           </tr>
           <tr class="wc-row-item">
+            <td class="wc-td-check">
+              <input type="checkbox" class="wc-comp-checkbox" data-component="other" title="Include Other in selected count">
+            </td>
             <td class="wc-td-label"><strong>Other:</strong></td>
             <td class="wc-td-num" id="wcOtherWords">0</td>
             <td class="wc-td-num" id="wcOtherChars">0</td>
+          </tr>
+
+          <!-- Math Count Section -->
+          <tr class="wc-row-section-header">
+            <td colspan="4"><strong>Math &amp; Formulae</strong></td>
+          </tr>
+          <tr class="wc-row-math">
+            <td class="wc-td-check"></td>
+            <td class="wc-td-label">Inline math (<code class="wc-code">$...$</code>):</td>
+            <td class="wc-td-num" id="wcMathInline">0</td>
+            <td class="wc-td-num wc-td-unit">formulae</td>
+          </tr>
+          <tr class="wc-row-math">
+            <td class="wc-td-check"></td>
+            <td class="wc-td-label">Display math (<code class="wc-code">\[...\]</code>):</td>
+            <td class="wc-td-num" id="wcMathDisplay">0</td>
+            <td class="wc-td-num wc-td-unit">formulae</td>
+          </tr>
+          <tr class="wc-row-math-total">
+            <td class="wc-td-check"></td>
+            <td class="wc-td-label"><strong>Total math expressions:</strong></td>
+            <td class="wc-td-num" id="wcMathTotal">0</td>
+            <td class="wc-td-num wc-td-unit">formulae</td>
           </tr>
         </tbody>
       </table>

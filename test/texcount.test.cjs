@@ -68,7 +68,7 @@ test('parseTeXBreakdown does not swallow text when encountering LaTeX line break
 \\begin{document}
 First paragraph with some words.\\\\[0.8em]
 {\\small Second paragraph with more words that must not be deleted}\\\\[1.2em]
-Third paragraph here.
+Third paragraph here with inline math $x^2 + y^2 = z^2$ included.
 \\[
   E = mc^2
 \\]
@@ -80,6 +80,11 @@ Fourth paragraph after math formula.
   // There should be ~23 words across all paragraphs, not truncated to 0 or 5 words!
   assert.ok(breakdown.total.words >= 20, `Expected at least 20 words, got ${breakdown.total.words}`);
   assert.ok(breakdown.mainText.characters > 100, `Expected >100 characters, got ${breakdown.mainText.characters}`);
+  assert.equal(breakdown.displayMath, 1, `Expected 1 display math block, got ${breakdown.displayMath}`);
+  assert.equal(breakdown.inlineMath, 1, `Expected 1 inline math expression, got ${breakdown.inlineMath}`);
+  const formatted = formatBreakdownText(breakdown);
+  assert.match(formatted, /Math inline:\t1 formulae/);
+  assert.match(formatted, /Math displayed:\t1 formulae/);
 });
 
 test('computeWordCount runs successfully and returns authoritative breakdown', async () => {

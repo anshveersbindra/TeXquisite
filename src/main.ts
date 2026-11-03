@@ -427,6 +427,11 @@ async function handle(method:string,args:unknown[]) {
       }
       return computeWordCount(content, targetPath);
     }
+    case 'writeClipboard': {
+      const text = typeof args[0] === 'string' ? args[0] : '';
+      clipboard.writeText(text);
+      return true;
+    }
     case 'initialize': {
       void runBackup();
       if(state.continuousPreview===undefined)state.continuousPreview=true;
