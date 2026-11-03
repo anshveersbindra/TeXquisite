@@ -85,13 +85,33 @@ export class ProjectSidebar {
       e.preventDefault();
       this.host.classList.remove('drag-over');
       const files = Array.from(e.dataTransfer?.files ?? []);
-      const filePaths = files.map((f: any) => f.path).filter(Boolean);
+      const desktop = (window as any).desktop;
+      const filePaths: string[] = [];
+      for (const f of files) {
+        const p = desktop?.getPathForFile ? desktop.getPathForFile(f) : (f as any).path;
+        if (p) filePaths.push(p);
+      }
       if (!filePaths.length) return;
       const target = this.getActiveFolder();
       if (!target) return;
       await this.call('copyFiles', target, filePaths);
       void this.refresh();
     });
+
+    const toggleAllBtn = document.getElementById('toggleAllOutline');
+    if (toggleAllBtn) {
+      toggleAllBtn.onclick = (e) => {
+        e.stopPropagation();
+        const nodes = Array.from(this.outline.querySelectorAll<HTMLElement>('.outline-tree-node'));
+        const someCollapsed = nodes.some(n => n.classList.contains('collapsed'));
+        for (const n of nodes) {
+          n.classList.toggle('collapsed', !someCollapsed);
+          const btn = n.querySelector<HTMLButtonElement>('.outline-toggle-btn');
+          if (btn) btn.replaceChildren(createSvg(!someCollapsed ? 'chevronRight' : 'chevronDown', 10));
+        }
+        toggleAllBtn.textContent = !someCollapsed ? 'Expand all' : 'Collapse all';
+      };
+    }
 
     const filterInput = document.getElementById('projectFileFilter') as HTMLInputElement | null;
     if (filterInput) {
@@ -285,24 +305,92 @@ export class ProjectSidebar {
 
     if (!doc) return;
     const file = doc.path, text = doc.text, entries = documentOutline(text);
+    // Filter strictly to headings: part, chapter, section, subsection, subsubsection, paragraph, subparagraph
+    const sectionEntries = entries.filter(e => e.kind === 'section' || e.level >= 0);
     const levelNames = ['Part', 'Chap', 'Sec', 'Sub', 'Subsub', 'Para', 'Subpara'];
-    for (const item of entries) {
+
+    interface OutlineNode {
+      item: (typeof entries)[number];
+      children: OutlineNode[];
+    }
+    const roots: OutlineNode[] = [];
+    const stack: OutlineNode[] = [];
+    for (const item of sectionEntries) {
+      const node: OutlineNode = { item, children: [] };
+      while (stack.length > 0 && stack[stack.length - 1].item.level >= item.level) {
+        stack.pop();
+      }
+      if (stack.length === 0) {
+        roots.push(node);
+      } else {
+        stack[stack.length - 1].children.push(node);
+      }
+      stack.push(node);
+    }
+
+    const renderNode = (node: OutlineNode, container: HTMLElement) => {
+      const nodeEl = document.createElement('div');
+      nodeEl.className = 'outline-tree-node';
+      nodeEl.dataset.level = String(node.item.level);
+
+      const row = document.createElement('div');
+      row.className = 'outline-item-row';
+
+      if (node.children.length > 0) {
+        const toggleBtn = document.createElement('button');
+        toggleBtn.type = 'button';
+        toggleBtn.className = 'outline-toggle-btn';
+        toggleBtn.title = 'Expand / Collapse';
+        toggleBtn.setAttribute('aria-label', 'Toggle branch');
+        toggleBtn.append(createSvg('chevronDown', 10));
+        toggleBtn.onclick = (e) => {
+          e.stopPropagation();
+          nodeEl.classList.toggle('collapsed');
+          toggleBtn.replaceChildren(createSvg(nodeEl.classList.contains('collapsed') ? 'chevronRight' : 'chevronDown', 10));
+        };
+        row.append(toggleBtn);
+      } else {
+        const spacer = document.createElement('span');
+        spacer.className = 'outline-leaf-bullet';
+        row.append(spacer);
+      }
+
       const button = document.createElement('button');
+      button.type = 'button';
       button.className = 'outline-item';
+      button.dataset.outlineAt = String(node.item.at);
+      button.title = `${node.item.label} (line ${node.item.line})`;
+
       const badge = document.createElement('span');
       badge.className = 'outline-level-badge';
-      badge.textContent = levelNames[item.level] ?? 'Sec';
+      badge.textContent = levelNames[node.item.level] ?? 'Sec';
+
       const label = document.createElement('span');
       label.className = 'outline-label';
-      label.textContent = item.label;
+      label.textContent = node.item.label;
+
       button.append(badge, label);
-      button.title = `${item.label} (line ${item.line})`;
-      button.style.paddingLeft = (6 + Math.min(item.level, 4) * 8) + 'px';
-      button.dataset.outlineAt = String(item.at);
-      button.onclick = () => this.jump(file, text, item.at);
-      this.outline.append(button);
+      button.onclick = () => this.jump(file, text, node.item.at);
+      row.append(button);
+      nodeEl.append(row);
+
+      if (node.children.length > 0) {
+        const childrenDiv = document.createElement('div');
+        childrenDiv.className = 'outline-children';
+        for (const child of node.children) {
+          renderNode(child, childrenDiv);
+        }
+        nodeEl.append(childrenDiv);
+      }
+
+      container.append(nodeEl);
+    };
+
+    for (const root of roots) {
+      renderNode(root, this.outline);
     }
-    if (!entries.length) {
+
+    if (!sectionEntries.length) {
       const empty = document.createElement('p');
       empty.className = 'outline-empty';
       empty.textContent = 'No section headings found in this file.';
@@ -340,6 +428,44 @@ export class ProjectSidebar {
         summaryLabel.append(createSvg('folder', 14), ' ' + (isMain ? folderName : 'Support: ' + folderName));
         summary.append(summaryLabel);
         summary.title = folder;
+        summary.ondragover = (e: DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+          summary.classList.add('drag-hover');
+        };
+        summary.ondragleave = (e: DragEvent) => {
+          if (!summary.contains(e.relatedTarget as Node)) {
+            summary.classList.remove('drag-hover');
+          }
+        };
+        summary.ondrop = async (e: DragEvent) => {
+          e.preventDefault();
+          e.stopPropagation();
+          summary.classList.remove('drag-hover');
+          const internal = e.dataTransfer?.getData('application/x-texquisite-path') || e.dataTransfer?.getData('text/plain');
+          if (internal && internal !== folder) {
+            try {
+              await this.call('moveEntry', internal, folder);
+              void this.refresh();
+              return;
+            } catch (err: any) {
+              alert(err?.message || String(err));
+              return;
+            }
+          }
+          const files = Array.from(e.dataTransfer?.files ?? []);
+          const desktop = (window as any).desktop;
+          const filePaths: string[] = [];
+          for (const f of files) {
+            const p = desktop?.getPathForFile ? desktop.getPathForFile(f) : (f as any).path;
+            if (p) filePaths.push(p);
+          }
+          if (filePaths.length) {
+            await this.call('copyFiles', folder, filePaths);
+            void this.refresh();
+          }
+        };
 
         // Context actions on folder header
         const folderActions = document.createElement('span');
@@ -414,6 +540,44 @@ export class ProjectSidebar {
           label.textContent = entry.name;
 
           summary.append(icon, label);
+          summary.ondragover = (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+            summary.classList.add('drag-hover');
+          };
+          summary.ondragleave = (e: DragEvent) => {
+            if (!summary.contains(e.relatedTarget as Node)) {
+              summary.classList.remove('drag-hover');
+            }
+          };
+          summary.ondrop = async (e: DragEvent) => {
+            e.preventDefault();
+            e.stopPropagation();
+            summary.classList.remove('drag-hover');
+            const internal = e.dataTransfer?.getData('application/x-texquisite-path') || e.dataTransfer?.getData('text/plain');
+            if (internal && internal !== entry.path) {
+              try {
+                await this.call('moveEntry', internal, entry.path);
+                void this.refresh();
+                return;
+              } catch (err: any) {
+                alert(err?.message || String(err));
+                return;
+              }
+            }
+            const files = Array.from(e.dataTransfer?.files ?? []);
+            const desktop = (window as any).desktop;
+            const filePaths: string[] = [];
+            for (const f of files) {
+              const p = desktop?.getPathForFile ? desktop.getPathForFile(f) : (f as any).path;
+              if (p) filePaths.push(p);
+            }
+            if (filePaths.length) {
+              await this.call('copyFiles', entry.path, filePaths);
+              void this.refresh();
+            }
+          };
 
           // Subdirectory actions
           const actions = document.createElement('span');
@@ -499,6 +663,18 @@ export class ProjectSidebar {
           item.className = 'tree-item';
           item.dataset.projectFile = entry.path;
           item.classList.toggle('active', entry.path === this.state.active);
+          item.draggable = true;
+          item.ondragstart = (e: DragEvent) => {
+            if (e.dataTransfer) {
+              e.dataTransfer.setData('text/plain', entry.path);
+              e.dataTransfer.setData('application/x-texquisite-path', entry.path);
+              e.dataTransfer.effectAllowed = 'copyMove';
+            }
+            item.classList.add('tree-dragging');
+          };
+          item.ondragend = () => {
+            item.classList.remove('tree-dragging');
+          };
 
           const left = document.createElement('div');
           left.className = 'tree-label';

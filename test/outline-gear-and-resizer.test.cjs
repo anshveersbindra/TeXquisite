@@ -83,4 +83,28 @@ test('Renderer defines BibTeX syntax highlighting and Tab autocomplete', () => {
   assert.ok(rendererSrc.includes("key: 'Tab', run: acceptCompletion"), 'Must bind Tab to acceptCompletion');
   assert.ok(rendererSrc.includes("key: 'Mod-h'"), 'Must bind Mod-h to find and replace');
   assert.ok(rendererSrc.includes('initSidebarResizer()'), 'Must initialize sidebar resizer');
+  assert.ok(rendererSrc.includes('initOutlineResizer()'), 'Must initialize outline resizer');
 });
+
+test('Distinct icons and informative tooltips for problems and build log in toolbar', () => {
+  const toolbarSrc = fs.readFileSync(path.resolve(__dirname, '../src/toolbar.ts'), 'utf8');
+  assert.ok(toolbarSrc.includes("problems: 'M10.29"), 'Must define distinct problems alert icon');
+  assert.ok(toolbarSrc.includes("terminal: 'M4 17l6-6-6-6"), 'Must define distinct terminal icon');
+  assert.ok(toolbarSrc.includes("['toggleProblems', 'problems',"), 'toggleProblems must map to problems icon');
+  assert.ok(toolbarSrc.includes("['toggleLog', 'terminal',"), 'toggleLog must map to terminal icon');
+});
+
+test('Outline divider and expandable line tree structure with settings tab isolation', () => {
+  const html = fs.readFileSync(path.resolve(__dirname, '../media/index.html'), 'utf8');
+  assert.ok(html.includes('id="outlineDivider"'), 'Must have outlineDivider resizer');
+  assert.ok(html.includes('id="toggleAllOutline"'), 'Must have toggleAllOutline button');
+
+  const css = fs.readFileSync(path.resolve(__dirname, '../media/app.css'), 'utf8');
+  assert.ok(css.includes('.panel-v-divider'), 'app.css must style panel-v-divider');
+  assert.ok(css.includes('.outline-children'), 'app.css must style outline-children tree lines');
+  assert.ok(css.includes('.settings-tab-pane[hidden]'), 'app.css must strictly hide hidden settings tab panes');
+
+  const rendererSrc = fs.readFileSync(path.resolve(__dirname, '../src/renderer.ts'), 'utf8');
+  assert.ok(rendererSrc.includes('dismissedNoticeKey'), 'Must track dismissed error notice key');
+});
+

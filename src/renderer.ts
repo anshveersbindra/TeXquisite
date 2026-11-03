@@ -905,11 +905,14 @@ function renderIssue(){
 let recoveryNoticeState='';
 let toolchainNoticeDismissed=false;
 let previewNoticeDismissed=false;
+let dismissedNoticeKey='';
 let lastNoticeIssueId='';
 function renderRecoveryNotice(reason?:string){
  const issue=compileIssue?.root===model.root?compileIssue:projectProblems.find(i=>i.root===model.root&&i.severity!=='warning'),recovered=localCanvas&&localCanvas.dataset.localEditId===latestEdit?.id?localCanvas.dataset.localRecovered==='true':current?.timing?.recovered,notice=el('previewNotice');
  const currentIssueId=issue?(issue.file??'')+':'+(issue.line??'')+':'+(issue.message??''):(reason??'');
- if(currentIssueId!==lastNoticeIssueId){lastNoticeIssueId=currentIssueId;if(!currentIssueId)previewNoticeDismissed=false;}
+ if(currentIssueId && currentIssueId!==lastNoticeIssueId && currentIssueId!==dismissedNoticeKey){
+   lastNoticeIssueId=currentIssueId;
+ }
  const issues=projectProblems.filter(i=>i.root===model.root);if(issue&&!issues.some(i=>i.id===issue.id))issues.push(issue);
  const checking=issues.filter(i=>diagnosticTracker.pending(i)).length,errors=issues.filter(i=>i.severity!=='warning'&&!diagnosticTracker.pending(i)).length,warnings=issues.filter(i=>i.severity==='warning').length,extra=[sourceWarning.trim()||(!errors?operationIssue:undefined),backupIssue].filter((s):s is string=>!!s);
  const count=errors+extra.length,summary=`${count} error${count===1?'':'s'}`+(checking?` · ${checking} checking`:'')+(warnings?` · ${warnings} warning${warnings===1?'':'s'}`:'');
@@ -920,7 +923,15 @@ function renderRecoveryNotice(reason?:string){
  const badge=el('errorCount');if(badge.textContent!==summary)badge.textContent=summary;badge.dataset.errors=String(count);badge.dataset.checking=String(checking);badge.dataset.warnings=String(warnings);badge.setAttribute('aria-label',summary+'. Show details');
  el('statusBar').dataset.severity=count?'error':checking||warnings||recovered?'warning':'normal';
  const hasFatalError=!!issue&&issue.severity!=='warning';
- notice.hidden=previewNoticeDismissed||!hasFatalError;if(notice.hidden){notice.title='';return;}
+ const isDismissed=previewNoticeDismissed || (!!dismissedNoticeKey && currentIssueId === dismissedNoticeKey);
+ notice.hidden=isDismissed||!hasFatalError;
+ if(notice.hidden){
+   notice.style.display='none';
+   notice.title='';
+   return;
+ } else {
+   notice.style.display='';
+ }
  const where=issue?.file&&issue.line?` (${issue.file.split(/[\\/]/).at(-1)}, line ${issue.line})`:'';
  const message=primary?.message??extra[0]??reason??'Temporary preview repair';
  const skipped=message.match(/Preview skipped undefined command (\\\S+?)\./),short=skipped?'Undefined command '+skipped[1]:message.replace(/\s+/g,' ').split(/\. (?=[A-Z])/)[0];
@@ -960,7 +971,7 @@ el('previewNoticeError').onclick=()=>{const issue=compileIssue??projectProblems.
 el('previewNoticeDetails').onclick=()=>{if(projectProblems.length){el<HTMLDetailsElement>('problems').open=true;el<HTMLSelectElement>('problemFilter').value='all';renderProblems();}else if(backupIssue)void command(showBackups);else el<HTMLDetailsElement>('logs').open=true;};
 el('errorCount').onclick=()=>{if(!el('previewNotice').hidden)el('previewNoticeDetails').click();else el('toggleProblems').click();};
 el('previewNoticeRetry').onclick=()=>void command(async()=>{const button=el<HTMLButtonElement>('previewNoticeRetry');button.disabled=true;try{await flush();canonicalRequested=true;await api.call('retryPreview');}finally{button.disabled=false;}});
-el('previewNoticeDismiss').onclick=()=>{previewNoticeDismissed=true;el('previewNotice').hidden=true;};
+el('previewNoticeDismiss').onclick=(e)=>{e.stopPropagation();previewNoticeDismissed=true;dismissedNoticeKey=lastNoticeIssueId||'dismissed';const n=el('previewNotice');n.hidden=true;n.style.display='none';};
 el('dismissToolchainNotice').onclick=()=>{toolchainNoticeDismissed=true;el('toolchainNotice').hidden=true;};
 el('dismissDiagnostics').onclick=()=>{el('diagnostics').hidden=true;};
 el('dismissBackupWarning').onclick=()=>{el('backupWarning').hidden=true;};
@@ -1145,6 +1156,8 @@ function createState(text:string){
   if(applyingProjectReplace)return;
   if(update.docChanged||update.selectionSet){if(surroundSession)cancelSurround();navigationToken++;if(!previewApplying&&previewSession)endPreview();}
   if(update.docChanged){
+    previewNoticeDismissed=false;
+    dismissedNoticeKey='';
     diagnosticTracker.changed(active,at=>update.changes.mapPos(Math.min(at,update.startState.doc.length),1),update.state.doc);
     el('pages').querySelectorAll('.navigation-marker').forEach(marker=>marker.remove());
     const edit={id:editSession+'-'+(++editSequence),startedAt:inputStartedAt||performance.now(),text:update.state.doc.toString()};inputStartedAt=0;
@@ -1335,7 +1348,7 @@ for(const [button,method] of [['new','new'],['open','open'],['support','support'
   model=response;renderEditor();
   if(method==='saveCopy'&&model.docs.find((d:any)=>d.path===active)?.dirty){lastSent.delete(active);await flush();}
 });
-for(const method of ['build','cancel','export','previous'])el(method).onclick=()=>void command(async()=>{if(method==='build')userDismissedErrorOverlay=false;if(method!=='cancel')await tabActivationChain.catch(()=>{});await flush();await api.call(method);});
+for(const method of ['build','cancel','export','previous'])el(method).onclick=()=>void command(async()=>{if(method==='build'){userDismissedErrorOverlay=false;previewNoticeDismissed=false;dismissedNoticeKey='';}if(method!=='cancel')await tabActivationChain.catch(()=>{});await flush();await api.call(method);});
 el('live').onclick=()=>void command(async()=>{await flush();model.onSave=await api.call('live');renderTabs();renderIssue();refreshPreviewStatus();});
 el('toggleStatus').onclick=()=>void command(async()=>{model.statusBar=model.statusBar===false;renderTabs();await api.call('statusBar',model.statusBar);});
 el('toggleLog').onclick=()=>{const log=el<HTMLDetailsElement>('logs');log.open=!log.open;};
@@ -1382,7 +1395,11 @@ document.querySelectorAll<HTMLButtonElement>('.settings-tabs .tab-btn').forEach(
     document.querySelectorAll('.settings-tabs .tab-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     const target = btn.dataset.tab;
-    document.querySelectorAll('.settings-tab-pane').forEach(p => (p as HTMLElement).hidden = p.id !== target);
+    document.querySelectorAll('.settings-tab-pane').forEach(p => {
+      const isTarget = p.id === target;
+      (p as HTMLElement).hidden = !isTarget;
+      p.classList.toggle('active', isTarget);
+    });
   };
 });
 el('closeSettingsX').onclick = () => el<HTMLDialogElement>('settingsDialog').close();
@@ -1435,6 +1452,12 @@ const settingsReviewBackups = el('settingsReviewBackups');
 if (settingsReviewBackups) settingsReviewBackups.onclick = () => void command(showBackups);
 
 el('settings').onclick = () => {
+  document.querySelectorAll('.settings-tabs .tab-btn').forEach((b, i) => b.classList.toggle('active', i === 0));
+  document.querySelectorAll('.settings-tab-pane').forEach((p, i) => {
+    const isTarget = i === 0;
+    (p as HTMLElement).hidden = !isTarget;
+    p.classList.toggle('active', isTarget);
+  });
   el('formatPreparation').textContent = '';
   el<HTMLSelectElement>('prefTheme').value = currentThemeSetting;
   el<HTMLInputElement>('prefPdfInvert').checked = currentPdfInvert;
@@ -2359,7 +2382,7 @@ function initSidebarResizer() {
   window.addEventListener('mousemove', (e: MouseEvent) => {
     if (!isDragging) return;
     const delta = e.clientX - startX;
-    const newWidth = Math.max(160, Math.min(600, startWidth + delta));
+    const newWidth = Math.max(160, Math.min(750, startWidth + delta));
     sidebar.style.width = newWidth + 'px';
   });
 
@@ -2385,13 +2408,65 @@ function initSidebarResizer() {
       sidebar.style.width = nw + 'px';
       localStorage.setItem('texquisite_sidebar_width', String(nw));
     } else if (e.key === 'ArrowRight') {
-      const nw = Math.min(600, cur + 16);
+      const nw = Math.min(750, cur + 16);
       sidebar.style.width = nw + 'px';
       localStorage.setItem('texquisite_sidebar_width', String(nw));
     }
   });
 }
+function initOutlineResizer() {
+  const divider = document.getElementById('outlineDivider');
+  const outline = document.getElementById('documentOutline');
+  if (!divider || !outline) return;
+
+  const savedHeight = localStorage.getItem('texquisite_outline_height');
+  if (savedHeight) {
+    const h = parseInt(savedHeight, 10);
+    if (!isNaN(h) && h >= 60 && h <= 800) {
+      outline.style.maxHeight = h + 'px';
+      outline.style.height = h + 'px';
+    }
+  }
+
+  let isDragging = false;
+  let startY = 0;
+  let startHeight = 0;
+
+  divider.addEventListener('mousedown', (e: MouseEvent) => {
+    isDragging = true;
+    startY = e.clientY;
+    startHeight = outline.getBoundingClientRect().height;
+    divider.classList.add('dragging');
+    document.body.style.cursor = 'row-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  window.addEventListener('mousemove', (e: MouseEvent) => {
+    if (!isDragging) return;
+    const delta = startY - e.clientY;
+    const newHeight = Math.max(60, Math.min(800, startHeight + delta));
+    outline.style.maxHeight = newHeight + 'px';
+    outline.style.height = newHeight + 'px';
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    divider.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    const currentH = Math.round(outline.getBoundingClientRect().height);
+    localStorage.setItem('texquisite_outline_height', String(currentH));
+  });
+
+  divider.addEventListener('dblclick', () => {
+    outline.style.maxHeight = '280px';
+    outline.style.height = '280px';
+    localStorage.setItem('texquisite_outline_height', '280');
+  });
+}
 initSidebarResizer();
+initOutlineResizer();
 model=await api.call('initialize');
 applyTheme(model.theme||'auto',!!model.pdfInvert);
 projectSidebar.update(model);

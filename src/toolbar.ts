@@ -24,7 +24,9 @@ const paths: Record<string, string> = {
   follow: 'M4 3l6 18 3-8 8-3z',
   edit: 'M4 16L16 4l4 4L8 20H4z M13 7l4 4',
   status: 'M3 4h18v16H3z M3 15h18 M7 18h3',
-  log: 'M4 5h16M4 10h16M4 15h10M4 20h10',
+  problems: 'M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01',
+  terminal: 'M4 17l6-6-6-6 M12 19h8',
+  log: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z M14 2v6h6 M16 13H8 M16 17H8 M10 9H8',
   panels: 'M3 4h18v16H3z M12 4v16',
   pages: 'M6 3h13v15H6z M3 7v14h13',
   zoom: 'M10 3a7 7 0 1 0 0 14 7 7 0 0 0 0-14 M15 15l7 7 M7 10h6M10 7v6',
@@ -119,9 +121,10 @@ export function installToolbar() {
     ['editPreview', 'edit', 'Edit verified text and math in the preview'],
     ['locate', 'locate', 'Show source cursor in PDF (Ctrl+Enter)'],
     ['follow', 'follow', 'Follow typing in the preview'],
-    ['toggleStatus', 'status', 'Show or hide preview timing details'],
-    ['toggleProblems', 'log', 'Show or hide project problems'],
-    ['toggleLog', 'log', 'Show or hide the build log']
+    ['toggleStatus', 'status', 'Status Bar: Show or hide preview status and timing details'],
+    ['toggleProblems', 'problems', 'Problems: View LaTeX compiler diagnostics and error list'],
+    ['toggleLog', 'terminal', 'Build Log: View full raw compiler output and transcript'],
+    ['settings', 'settings', 'Preferences: Configure themes, editor fonts, TeX engine, and backups (⌘,)']
   ];
   for (const args of buttons) toolbarButton(...args);
   updateToolbarSelects();
