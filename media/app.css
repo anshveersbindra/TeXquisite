@@ -344,8 +344,9 @@ body.darwin header a {
 }
 [data-theme="dark"] .brand img,
 [data-theme="midnight"] .brand img,
-[data-theme="nord"] .brand img {
-  filter: brightness(1.1) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.4));
+[data-theme="nord"] .brand img,
+[data-is-dark="true"] .brand img {
+  filter: brightness(0) invert(1) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
 }
 .brand .mark {
   font-family: Georgia, serif;
@@ -800,14 +801,19 @@ footer#rootLabel {
   background: var(--dialog-bg);
   border: 1px solid var(--dialog-border);
   border-radius: 8px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
-  padding: 8px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-width: 390px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22), 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 10px 14px;
+  display: block;
+  width: auto;
+  min-width: 360px;
+  max-width: 450px;
   font-size: 11.5px;
   color: var(--text-app);
+}
+.cm-panel.cm-search br {
+  display: block;
+  content: "";
+  margin-top: 6px;
 }
 .cm-panel.cm-search input {
   font-family: var(--font-sans);
@@ -819,6 +825,9 @@ footer#rootLabel {
   color: var(--text-app);
   outline: none;
   transition: border-color 0.12s, box-shadow 0.12s;
+  width: 140px;
+  vertical-align: middle;
+  margin-right: 4px;
 }
 .cm-panel.cm-search input:focus {
   border-color: var(--brand-primary);
@@ -827,27 +836,43 @@ footer#rootLabel {
 .cm-panel.cm-search button {
   padding: 3px 8px;
   font-size: 11px;
+  font-weight: 500;
   border-radius: 4px;
   background: var(--btn-bg);
   border: 1px solid var(--btn-border);
   color: var(--text-app);
   cursor: pointer;
+  vertical-align: middle;
+  margin-right: 4px;
+  transition: all 0.1s ease;
 }
 .cm-panel.cm-search button:hover {
   background: var(--btn-hover);
+  border-color: var(--border-pane);
+}
+.cm-panel.cm-search button:active {
+  transform: translateY(1px);
 }
 .cm-panel.cm-search label {
   font-size: 10.5px;
   color: var(--text-pane-label);
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   cursor: pointer;
+  margin-right: 6px;
+  vertical-align: middle;
+  user-select: none;
+}
+.cm-panel.cm-search label input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--brand-primary);
 }
 .cm-panel.cm-search [name="close"] {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 7px;
+  right: 7px;
   border: 0;
   background: transparent;
   font-size: 14px;
@@ -857,6 +882,7 @@ footer#rootLabel {
   color: var(--text-pane-label);
   border-radius: 4px;
   box-shadow: none;
+  margin: 0;
 }
 .cm-panel.cm-search [name="close"]:hover {
   color: var(--text-app);
@@ -1100,6 +1126,27 @@ html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
   flex-direction: column;
 }
 #projectSidebar[hidden] { display: none; }
+#projectSidebar.drag-over {
+  outline: 2px dashed var(--brand-primary);
+  outline-offset: -3px;
+  background: var(--brand-primary-subtle);
+}
+
+#sidebarDivider {
+  width: 5px;
+  cursor: col-resize;
+  background: var(--divider-bg);
+  flex-shrink: 0;
+  transition: background 0.12s ease;
+  z-index: 10;
+  position: relative;
+}
+#sidebarDivider:hover, #sidebarDivider.dragging {
+  background: var(--divider-active);
+}
+#projectSidebar[hidden] + #sidebarDivider {
+  display: none;
+}
 
 .project-heading {
   display: flex;
@@ -1356,13 +1403,15 @@ html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
 #documentOutline {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: 2px 6px 8px;
-  max-height: 180px;
+  gap: 2px;
+  padding: 4px 6px 10px;
+  max-height: 240px;
   overflow-y: auto;
 }
-#documentOutline button {
-  display: block;
+#documentOutline .outline-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
   border: 0;
   background: transparent;
@@ -1372,15 +1421,40 @@ html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
   border-radius: 4px;
   color: var(--text-pane-label);
   cursor: pointer;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
   box-shadow: none;
   transition: all 0.1s ease;
 }
-#documentOutline button:hover {
+#documentOutline .outline-level-badge {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 3px;
   background: var(--btn-hover);
   color: var(--brand-primary);
+}
+#documentOutline .outline-label {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
+#documentOutline .outline-item:hover {
+  background: var(--btn-hover);
+  color: var(--text-app);
+}
+#documentOutline .outline-item:hover .outline-label {
+  color: var(--brand-primary);
+}
+#documentOutline .outline-empty {
+  font-size: 11px;
+  color: var(--text-pane-label);
+  padding: 4px 8px;
+  margin: 0;
 }
 
 /* ========================================================================= */
@@ -1498,20 +1572,21 @@ html[data-pdf-invert="true"] #pages canvas, body.pdf-invert #pages canvas {
   display: flex;
   align-items: center;
   gap: 8px;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
-  background: #fee2e2;
-  border: 1px solid #fca5a5;
-  color: #991b1b;
-  border-radius: 5px;
+  max-width: 580px;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+  color: #dc2626;
+  border-radius: 4px;
   padding: 1px 8px;
   font-size: 11px;
 }
 [data-theme="dark"] #previewNotice,
 [data-theme="midnight"] #previewNotice,
 [data-theme="nord"] #previewNotice {
-  background: #450a0a;
-  border-color: #7f1d1d;
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.25);
   color: #fca5a5;
 }
 .notice-text-wrap {

@@ -36,7 +36,7 @@ export async function discoverProject(options:BuildOptions,parent:string,signal:
   };
   for(const folder of folders)await index(folder);
   // Do not let old job auxiliary files in a search folder poison discovery.
-  for(const extension of ['aux','out','toc','lof','lot','nav','snm','vrb','bbl'])for(const target of [work,out])await fs.writeFile(path.join(target,job+'.'+extension),'');
+  for(const extension of ['aux','out','toc','lof','lot','nav','snm','vrb'])for(const target of [work,out])await fs.writeFile(path.join(target,job+'.'+extension),'');
   const search=[work,...folders].map(folder=>folder.replace(/\\/g,'/')).join(path.delimiter)+path.delimiter;
   const env:NodeJS.ProcessEnv={};for(const name of ['TEXINPUTS','BIBINPUTS','BSTINPUTS','TFMFONTS','VFFONTS','T1FONTS','ENCFONTS','TEXFONTMAPS','TEXPSHEADERS'])env[name]=search+(process.env[name]??'');
   const mode:Record<string,string>={pdflatex:'-pdf',xelatex:'-xelatex',lualatex:'-lualatex',latex:'-pdfps'};if(!mode[options.engine])throw Error('Unsupported discovery engine.');
@@ -68,7 +68,10 @@ export async function discoverProject(options:BuildOptions,parent:string,signal:
   for(const line of record.split(/\r?\n/)){if(line.startsWith('PWD '))cwd=path.resolve(line.slice(4));else if(line.startsWith('INPUT ')){const name=line.slice(6).replace(/^"|"$/g,'');await accept(path.resolve(cwd,name));}}
   // Bibliography processors do not necessarily appear in the TeX recorder.
   const aux=await fs.readFile(path.join(out,job+'.aux'),'utf8').catch(()=>'');
-  for(const match of aux.matchAll(/\\(bibdata|bibstyle)\{([^}]+)\}/g))for(const item of match[2].split(','))for(const folder of folders)await accept(path.join(folder,item+(path.extname(item)?'':match[1]==='bibdata'?'.bib':'.bst')));
+  for(const match of aux.matchAll(/\\(bibdata|bibstyle)\{([^}]+)\}/g))for(const item of match[2].split(','))for(const folder of folders)await accept(path.join(folder,item.trim()+(path.extname(item.trim())?'':match[1]==='bibdata'?'.bib':'.bst')));
+  const bcf=await fs.readFile(path.join(out,job+'.bcf'),'utf8').catch(()=>'');
+  for(const match of bcf.matchAll(/<bcf:datasource[^>]*>([^<]+)<\/bcf:datasource>/g))for(const folder of folders)await accept(path.join(folder,match[1].trim()));
+  for(const file of Object.keys(expected))if(/\.(bib|bst)$/i.test(file))await accept(file);
   // latexmk also records inputs read by bibliography/conversion subprocesses.
   const database=await fs.readFile(path.join(out,job+'.fdb_latexmk'),'utf8').catch(()=>'');
   for(const match of database.matchAll(/^\s+"([^"\r\n]+)"\s+\d/gm)){const file=match[1];if(path.isAbsolute(file))await accept(file);else{

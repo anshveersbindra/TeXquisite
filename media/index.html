@@ -70,6 +70,9 @@
         <button id="projectSearch" title="Find in Project (Cmd+Shift+F)" aria-label="Find in project">
           <svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
         </button>
+        <button id="uploadProjectFiles" title="Upload files from disk to project" aria-label="Upload files">
+          <svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+        </button>
         <button id="refreshProject" title="Refresh files" aria-label="Refresh files">
           <svg class="app-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
         </button>
@@ -84,6 +87,8 @@
       <nav id="documentOutline" aria-label="Document outline"></nav>
     </details>
   </aside>
+
+  <div id="sidebarDivider" role="separator" tabindex="0" title="Drag to resize sidebar; double-click to reset" aria-label="Resize project sidebar"></div>
 
   <main id="workspace" data-panel-layout="side-by-side">
     <section class="source" id="sourcePane">

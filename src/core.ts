@@ -404,7 +404,10 @@ export class BuildController {
       if(!pdf){
         nativeAttempted=true;
         if(options.automatic)this.retryingNativeFor=this.sourceIdentity(options);
-        try{await runWithPreviewCompatibility(runProcess,options.executable,args,input,options.timeoutMs,abort.signal,nativeLog);}
+        const searchFolders=[input,output,path.dirname(path.resolve(options.root)),...(options.supportFolders??[])].map(f=>f.replace(/\\/g,'/')).join(path.delimiter)+path.delimiter;
+        const nativeEnv:NodeJS.ProcessEnv={};
+        for(const name of ['TEXINPUTS','BIBINPUTS','BSTINPUTS','TFMFONTS','VFFONTS','T1FONTS','ENCFONTS','TEXFONTMAPS','TEXPSHEADERS']){nativeEnv[name]=searchFolders+(process.env[name]??'');}
+        try{await runWithPreviewCompatibility(runProcess,options.executable,args,input,options.timeoutMs,abort.signal,nativeLog,nativeEnv);}
         catch(error){
           const transcript=await fs.readFile(path.join(output,base+'.log'),'utf8').catch(()=>'');
           // Modern tkz-euclide already loads its objects. Older documents may
@@ -414,7 +417,7 @@ export class BuildController {
           check();
           this.log('Compatibility: modern tkz-euclide loads its objects automatically. Retrying without the obsolete \\usetkzobj{all} line in the build copy; editor source is unchanged.\n');
           await fs.writeFile(path.join(input,path.basename(options.root)),emptyDocumentPreview(withoutLegacyTkz(source)));mirror.reset();
-          await runWithPreviewCompatibility(runProcess,options.executable,args,input,options.timeoutMs,abort.signal,nativeLog);
+          await runWithPreviewCompatibility(runProcess,options.executable,args,input,options.timeoutMs,abort.signal,nativeLog,nativeEnv);
           this.legacyTkzCompatible=true;
         }
       }

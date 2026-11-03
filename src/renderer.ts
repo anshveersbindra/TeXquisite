@@ -5,7 +5,7 @@ import {mathSpans,isMath,nearestMathCaret,mathCaretBox,moveMath,moveMathAcross,c
 import {EditorView,basicSetup} from 'codemirror';
 import {keymap} from '@codemirror/view';
 import {undo,redo,isolateHistory} from '@codemirror/commands';
-import {autocompletion,CompletionContext,CompletionResult,startCompletion,completionKeymap,nextSnippetField,prevSnippetField,clearSnippet,snippet} from '@codemirror/autocomplete';
+import {autocompletion,CompletionContext,CompletionResult,startCompletion,completionKeymap,acceptCompletion,nextSnippetField,prevSnippetField,clearSnippet,snippet} from '@codemirror/autocomplete';
 import {search,openSearchPanel,closeSearchPanel,searchKeymap} from '@codemirror/search';
 import {proseSpans,nearestCaret,caretBox,textChange,ordinaryText,textBoundary,pageProse,visualMoveAcross,ProseLine,PdfCharacter} from './preview-edit';
 import {EditorState,Transaction,Compartment} from '@codemirror/state';
@@ -121,6 +121,136 @@ const darkSyntaxHighlighting = syntaxHighlighting(HighlightStyle.define([
   { tag: t.invalid, color: '#f85149' }
 ]));
 
+const lightSyntaxHighlighting = syntaxHighlighting(HighlightStyle.define([
+  { tag: t.keyword, color: '#cf222e', fontWeight: '600' },
+  { tag: [t.name, t.deleted, t.character, t.macroName], color: '#0550ae' },
+  { tag: [t.function(t.variableName), t.labelName], color: '#8250df', fontWeight: '500' },
+  { tag: [t.color, t.constant(t.name), t.standard(t.name)], color: '#0550ae' },
+  { tag: [t.definition(t.name), t.separator], color: '#953800' },
+  { tag: [t.typeName, t.className, t.number, t.changed, t.annotation, t.modifier, t.self, t.namespace], color: '#116329' },
+  { tag: [t.operator, t.operatorKeyword, t.url, t.escape, t.regexp, t.link, t.special(t.string)], color: '#0a3069' },
+  { tag: [t.meta, t.comment], color: '#6e7781', fontStyle: 'italic' },
+  { tag: t.strong, fontWeight: 'bold', color: '#1f2328' },
+  { tag: t.emphasis, fontStyle: 'italic', color: '#1f2328' },
+  { tag: t.strikethrough, textDecoration: 'line-through' },
+  { tag: t.link, color: '#0969da', textDecoration: 'underline' },
+  { tag: t.heading, fontWeight: 'bold', color: '#0550ae' },
+  { tag: [t.atom, t.bool, t.special(t.variableName)], color: '#cf222e' },
+  { tag: t.bracket, color: '#953800' },
+  { tag: [t.processingInstruction, t.string, t.inserted], color: '#0a3069' },
+  { tag: t.invalid, color: '#cf222e' }
+]));
+
+interface BibState {
+  inEntry: boolean;
+  inParams: boolean;
+  inString: boolean;
+  stringQuote: string;
+  braceDepth: number;
+}
+
+const bibtexMode = {
+  name: 'bibtex',
+  tokenTable: {
+    keyword: t.keyword,
+    labelName: t.labelName,
+    propertyName: t.propertyName,
+    string: t.string,
+    number: t.number,
+    comment: t.comment,
+    bracket: t.bracket,
+    punctuation: t.punctuation
+  },
+  startState(): BibState {
+    return { inEntry: false, inParams: false, inString: false, stringQuote: '', braceDepth: 0 };
+  },
+  token(stream: any, state: BibState) {
+    if (stream.eatSpace()) return null;
+    if (stream.peek() === '%') {
+      stream.skipToEnd();
+      return 'comment';
+    }
+    if (!state.inEntry && stream.peek() === '@') {
+      stream.next();
+      if (stream.match(/^[a-zA-Z]+/)) {
+        state.inEntry = true;
+        state.inParams = false;
+        return 'keyword';
+      }
+    }
+    if (state.inEntry && !state.inParams) {
+      if (stream.peek() === '{' || stream.peek() === '(') {
+        stream.next();
+        state.inParams = true;
+        state.braceDepth = 1;
+        stream.eatSpace();
+        if (stream.match(/^[^,\s}]+/)) {
+          return 'labelName';
+        }
+        return 'bracket';
+      }
+    }
+    if (state.inParams) {
+      if (state.inString) {
+        if (stream.peek() === '\\') { stream.next(); stream.next(); return 'string'; }
+        if (stream.peek() === state.stringQuote) {
+          stream.next();
+          state.inString = false;
+          return 'string';
+        }
+        stream.match(/^[^"\\]+/);
+        return 'string';
+      }
+      if (stream.peek() === '"') {
+        stream.next();
+        state.inString = true;
+        state.stringQuote = '"';
+        return 'string';
+      }
+      if (stream.peek() === '{') {
+        stream.next();
+        state.braceDepth++;
+        return 'bracket';
+      }
+      if (stream.peek() === '}') {
+        stream.next();
+        state.braceDepth--;
+        if (state.braceDepth <= 0) {
+          state.inEntry = false;
+          state.inParams = false;
+          state.braceDepth = 0;
+        }
+        return 'bracket';
+      }
+      if (stream.peek() === ')') {
+        stream.next();
+        state.inEntry = false;
+        state.inParams = false;
+        return 'bracket';
+      }
+      if (stream.peek() === '=' || stream.peek() === ',') {
+        stream.next();
+        return 'punctuation';
+      }
+      if (stream.match(/^\d+\b/)) {
+        return 'number';
+      }
+      if (stream.match(/^[a-zA-Z0-9_-]+/)) {
+        return 'propertyName';
+      }
+      stream.next();
+      return null;
+    }
+    stream.next();
+    return null;
+  },
+  languageData: {
+    commentTokens: { line: '%' }
+  }
+};
+
+const bibtexLanguage = StreamLanguage.define(bibtexMode as any);
+
 let currentThemeSetting: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm' = 'auto';
 let currentPdfInvert = false;
 let systemIsDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
@@ -134,9 +264,9 @@ function computeIsDark(): boolean {
 function getThemeExtensions(theme: string, isDark: boolean) {
   if (theme === 'midnight') return [midnightEditorTheme, darkSyntaxHighlighting];
   if (theme === 'nord') return [nordEditorTheme, darkSyntaxHighlighting];
-  if (theme === 'warm') return [warmEditorTheme];
+  if (theme === 'warm') return [warmEditorTheme, lightSyntaxHighlighting];
   if (theme === 'dark' || (theme === 'auto' && isDark)) return [darkEditorTheme, darkSyntaxHighlighting];
-  return [lightEditorTheme];
+  return [lightEditorTheme, lightSyntaxHighlighting];
 }
 
 function applyTheme(theme?: 'auto'|'dark'|'midnight'|'nord'|'light'|'warm', pdfInvert?: boolean) {
@@ -470,8 +600,8 @@ let previewNoticeDismissed=false;
 let lastNoticeIssueId='';
 function renderRecoveryNotice(reason?:string){
  const issue=compileIssue?.root===model.root?compileIssue:projectProblems.find(i=>i.root===model.root&&i.severity!=='warning'),recovered=localCanvas&&localCanvas.dataset.localEditId===latestEdit?.id?localCanvas.dataset.localRecovered==='true':current?.timing?.recovered,notice=el('previewNotice');
- const currentIssueId=issue?issue.id+':'+(issue.editId??''):(recovered?'recovered':reason??'');
- if(currentIssueId!==lastNoticeIssueId){lastNoticeIssueId=currentIssueId;previewNoticeDismissed=false;}
+ const currentIssueId=issue?(issue.file??'')+':'+(issue.line??'')+':'+(issue.message??''):(reason??'');
+ if(currentIssueId!==lastNoticeIssueId){lastNoticeIssueId=currentIssueId;if(!currentIssueId)previewNoticeDismissed=false;}
  const issues=projectProblems.filter(i=>i.root===model.root);if(issue&&!issues.some(i=>i.id===issue.id))issues.push(issue);
  const checking=issues.filter(i=>diagnosticTracker.pending(i)).length,errors=issues.filter(i=>i.severity!=='warning'&&!diagnosticTracker.pending(i)).length,warnings=issues.filter(i=>i.severity==='warning').length,extra=[sourceWarning.trim()||(!errors?operationIssue:undefined),backupIssue].filter((s):s is string=>!!s);
  const count=errors+extra.length,summary=`${count} error${count===1?'':'s'}`+(checking?` · ${checking} checking`:'')+(warnings?` · ${warnings} warning${warnings===1?'':'s'}`:'');
@@ -481,7 +611,8 @@ function renderRecoveryNotice(reason?:string){
  if(state===recoveryNoticeState)return;recoveryNoticeState=state;
  const badge=el('errorCount');if(badge.textContent!==summary)badge.textContent=summary;badge.dataset.errors=String(count);badge.dataset.checking=String(checking);badge.dataset.warnings=String(warnings);badge.setAttribute('aria-label',summary+'. Show details');
  el('statusBar').dataset.severity=count?'error':checking||warnings||recovered?'warning':'normal';
- notice.hidden=previewNoticeDismissed||(!issue&&!recovered&&!reason&&!extra.length&&!warnings);if(notice.hidden){notice.title='';return;}
+ const hasFatalError=!!issue&&issue.severity!=='warning';
+ notice.hidden=previewNoticeDismissed||!hasFatalError;if(notice.hidden){notice.title='';return;}
  const where=issue?.file&&issue.line?` (${issue.file.split(/[\\/]/).at(-1)}, line ${issue.line})`:'';
  const message=primary?.message??extra[0]??reason??'Temporary preview repair';
  const skipped=message.match(/Preview skipped undefined command (\\\S+?)\./),short=skipped?'Undefined command '+skipped[1]:message.replace(/\s+/g,' ').split(/\. (?=[A-Z])/)[0];
@@ -681,12 +812,16 @@ const latexKeymap = keymap.of([
   { key: 'Alt-^', run: (v: EditorView) => insertMathSnippet(v, 'sup') },
   { key: 'Alt-_', run: (v: EditorView) => insertMathSnippet(v, 'sub') },
   { key: 'Mod-w', run: () => { closeTab(); return true; } },
+  { key: 'Mod-h', run: (v: EditorView) => { openSearchPanel(v); return true; } },
+  { key: 'Tab', run: acceptCompletion },
   ...completionKeymap
 ]);
 function createState(text:string){
  let pointer:{id:number;x:number;y:number}|undefined,pointerGeneration=0;
  const textHit=(event:PointerEvent,editor:EditorView)=>{const line=event.target instanceof Element?event.target.closest('.cm-line'):undefined;if(!line||!editor.contentDOM.contains(line))return false;const range=document.createRange();range.selectNodeContents(line);return [...range.getClientRects()].some(r=>r.width>0&&event.clientX>=r.left&&event.clientX<=r.right&&event.clientY>=r.top&&event.clientY<=r.bottom);};
- return EditorState.create({doc:text,extensions:[basicSetup,latexKeymap,search({top:true}),keymap.of(searchKeymap),lintGutter(),StreamLanguage.define(stex),texCompletion(()=>model.autoClose!==false),autocompletion({override:[latexCompletionSource],defaultKeymap:true,activateOnTyping:true,maxRenderedOptions:50}),EditorView.lineWrapping,themeCompartment.of(getThemeExtensions(currentThemeSetting,computeIsDark())),
+ const isBib=active.endsWith('.bib');
+ const langExt=isBib?bibtexLanguage:StreamLanguage.define(stex);
+ return EditorState.create({doc:text,extensions:[basicSetup,latexKeymap,search({top:true}),keymap.of(searchKeymap),lintGutter(),langExt,texCompletion(()=>model.autoClose!==false),autocompletion({override:[latexCompletionSource],defaultKeymap:true,activateOnTyping:true,maxRenderedOptions:50}),EditorView.lineWrapping,themeCompartment.of(getThemeExtensions(currentThemeSetting,computeIsDark())),
   EditorView.domEventHandlers({beforeinput(event,editor){
     markInput();
     const input=event as InputEvent;
@@ -696,7 +831,7 @@ function createState(text:string){
     event.preventDefault();
     if(input.data==='\\'&&model.autoClose!==false&&!editor.state.selection.main.empty&&editor.state.selection.ranges.length===1){showSurround(editor);return true;}
     editor.dispatch({...completeTex(editor.state,input.data,model.autoClose!==false),annotations:Transaction.userEvent.of('input.type'),scrollIntoView:true});
-    if(['\\','@','{',','].includes(input.data)||/[a-zA-Z]/.test(input.data)){queueMicrotask(()=>{if(view===editor)startCompletion(editor);});}
+    if(input.data==='\\'||(active.endsWith('.bib')&&input.data==='@')){queueMicrotask(()=>{if(view===editor)startCompletion(editor);});}
     return true;
   },pointerdown(event,editor){pointerGeneration++;pointer=event.button===0&&textHit(event,editor)?{id:event.pointerId,x:event.clientX,y:event.clientY}:undefined;return false;},pointerup(event,editor){const start=pointer;pointer=undefined;if(!start||start.id!==event.pointerId||!textHit(event,editor)||Math.abs(start.x-event.clientX)>4||Math.abs(start.y-event.clientY)>4){pointerGeneration++;renderRecoveryNotice();return false;}if(model.continuousPreview&&!suppressFollow){const generation=++pointerGeneration,doc=editor.state.doc,at=editor.state.selection.main.head;cancelAnimationFrame(followFrame);followFrame=requestAnimationFrame(()=>{if(generation===pointerGeneration&&view===editor&&editor.state.doc===doc&&editor.state.selection.main.head===at)void locateSource(true).catch(e=>{el('navState').textContent=String(e);});});}return false;},scroll(){renderRecoveryNotice();return false;},wheel(){pointer=undefined;pointerGeneration++;return false;},paste(event){if(imagePasteEvent(event))return true;markInput();return false;},cut(){markInput();return false;}}),EditorView.updateListener.of(update=>{
   if(applyingProjectReplace)return;
@@ -988,9 +1123,12 @@ el('settings').onclick = () => {
   el('formatPreparation').textContent = '';
   el<HTMLSelectElement>('prefTheme').value = currentThemeSetting;
   el<HTMLInputElement>('prefPdfInvert').checked = currentPdfInvert;
+  el<HTMLSelectElement>('prefFontSize').value = localStorage.getItem('texquisite_font_size') || '14';
   el<HTMLInputElement>('prefAutoClose').checked = model.autoClose !== false;
   el<HTMLInputElement>('prefFollowPreview').checked = !!model.followPreview;
   el<HTMLInputElement>('prefPreviewEditing').checked = !!model.previewEditing;
+  const backupsEl = el<HTMLInputElement>('automaticBackups');
+  if (backupsEl) backupsEl.checked = model.backups !== false;
   el<HTMLSelectElement>('engine').value = model.engine;
   el<HTMLInputElement>('latexmk').value = model.latexmk;
   el<HTMLInputElement>('onSave').checked = model.onSave;
@@ -1016,15 +1154,33 @@ el('applySettings').onclick = event => {
   void command(async () => {
     const themeVal = el<HTMLSelectElement>('prefTheme').value as any;
     const invertVal = el<HTMLInputElement>('prefPdfInvert').checked;
+    const fontSizeVal = el<HTMLSelectElement>('prefFontSize').value;
+    const autoCloseVal = el<HTMLInputElement>('prefAutoClose').checked;
+    const followPreviewVal = el<HTMLInputElement>('prefFollowPreview').checked;
+    const previewEditingVal = el<HTMLInputElement>('prefPreviewEditing').checked;
+    const backupsVal = el<HTMLInputElement>('automaticBackups')?.checked ?? true;
+    const onSaveVal = el<HTMLInputElement>('onSave').checked;
+
+    applyFontSize(fontSizeVal);
     model = await api.call('settings', {
       texBin: el<HTMLInputElement>('texBin').value,
       engine: el<HTMLSelectElement>('engine').value,
       latexmk: el<HTMLInputElement>('latexmk').value,
-      onSave: el<HTMLInputElement>('onSave').checked,
+      onSave: onSaveVal,
       theme: themeVal,
-      pdfInvert: invertVal
+      pdfInvert: invertVal,
+      autoClose: autoCloseVal,
+      followPreview: followPreviewVal,
+      previewEditing: previewEditingVal,
+      backups: backupsVal
     });
     applyTheme(themeVal, invertVal);
+    el('autoClose').setAttribute('aria-pressed', String(autoCloseVal));
+    el('autoClose').textContent = 'Match pairs: ' + (autoCloseVal ? 'on' : 'off');
+    el('follow').setAttribute('aria-pressed', String(followPreviewVal));
+    el('follow').textContent = 'Follow typing: ' + (followPreviewVal ? 'on' : 'off');
+    el('editPreview').setAttribute('aria-pressed', String(previewEditingVal));
+    el('editPreview').textContent = 'Edit preview: ' + (previewEditingVal ? 'on' : 'off');
     renderToolchain(model.toolchain, true);
     renderTabs();
     el<HTMLDialogElement>('settingsDialog').close();
@@ -1850,6 +2006,68 @@ api.on(async message=>{
     await api.call('close');
   });
 });
+function initSidebarResizer() {
+  const divider = document.getElementById('sidebarDivider');
+  const sidebar = document.getElementById('projectSidebar');
+  if (!divider || !sidebar) return;
+
+  const savedWidth = localStorage.getItem('texquisite_sidebar_width');
+  if (savedWidth) {
+    const w = parseInt(savedWidth, 10);
+    if (!isNaN(w) && w >= 160 && w <= 600) {
+      sidebar.style.width = w + 'px';
+    }
+  }
+
+  let isDragging = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  divider.addEventListener('mousedown', (e: MouseEvent) => {
+    isDragging = true;
+    startX = e.clientX;
+    startWidth = sidebar.getBoundingClientRect().width;
+    divider.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  window.addEventListener('mousemove', (e: MouseEvent) => {
+    if (!isDragging) return;
+    const delta = e.clientX - startX;
+    const newWidth = Math.max(160, Math.min(600, startWidth + delta));
+    sidebar.style.width = newWidth + 'px';
+  });
+
+  window.addEventListener('mouseup', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    divider.classList.remove('dragging');
+    document.body.style.cursor = '';
+    document.body.style.userSelect = '';
+    const currentW = Math.round(sidebar.getBoundingClientRect().width);
+    localStorage.setItem('texquisite_sidebar_width', String(currentW));
+  });
+
+  divider.addEventListener('dblclick', () => {
+    sidebar.style.width = '250px';
+    localStorage.setItem('texquisite_sidebar_width', '250');
+  });
+
+  divider.addEventListener('keydown', (e: KeyboardEvent) => {
+    const cur = sidebar.getBoundingClientRect().width;
+    if (e.key === 'ArrowLeft') {
+      const nw = Math.max(160, cur - 16);
+      sidebar.style.width = nw + 'px';
+      localStorage.setItem('texquisite_sidebar_width', String(nw));
+    } else if (e.key === 'ArrowRight') {
+      const nw = Math.min(600, cur + 16);
+      sidebar.style.width = nw + 'px';
+      localStorage.setItem('texquisite_sidebar_width', String(nw));
+    }
+  });
+}
+initSidebarResizer();
 model=await api.call('initialize');
 applyTheme(model.theme||'auto',!!model.pdfInvert);
 projectSidebar.update(model);

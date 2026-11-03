@@ -61,6 +61,38 @@ export class ProjectSidebar {
       newFolderBtn.onclick = () => void this.promptCreateFolder();
     }
 
+    const uploadBtn = document.getElementById('uploadProjectFiles');
+    if (uploadBtn) {
+      uploadBtn.onclick = async () => {
+        const target = this.getActiveFolder();
+        const res = await this.call('promptUploadFiles', target);
+        if (res) void this.refresh();
+      };
+    }
+
+    // Drag-and-drop file import from Finder / Explorer
+    this.host.addEventListener('dragover', (e: DragEvent) => {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+      this.host.classList.add('drag-over');
+    });
+    this.host.addEventListener('dragleave', (e: DragEvent) => {
+      if (!this.host.contains(e.relatedTarget as Node)) {
+        this.host.classList.remove('drag-over');
+      }
+    });
+    this.host.addEventListener('drop', async (e: DragEvent) => {
+      e.preventDefault();
+      this.host.classList.remove('drag-over');
+      const files = Array.from(e.dataTransfer?.files ?? []);
+      const filePaths = files.map((f: any) => f.path).filter(Boolean);
+      if (!filePaths.length) return;
+      const target = this.getActiveFolder();
+      if (!target) return;
+      await this.call('copyFiles', target, filePaths);
+      void this.refresh();
+    });
+
     const filterInput = document.getElementById('projectFileFilter') as HTMLInputElement | null;
     if (filterInput) {
       filterInput.oninput = () => {
@@ -253,18 +285,27 @@ export class ProjectSidebar {
 
     if (!doc) return;
     const file = doc.path, text = doc.text, entries = documentOutline(text);
+    const levelNames = ['Part', 'Chap', 'Sec', 'Sub', 'Subsub', 'Para', 'Subpara'];
     for (const item of entries) {
       const button = document.createElement('button');
-      button.textContent = (item.kind === 'environment' ? '↳ ' : '') + item.label;
-      button.title = `${item.kind === 'section' ? 'Heading' : 'Environment'} · line ${item.line}`;
-      button.style.paddingLeft = (8 + Math.min(item.level, 5) * 8) + 'px';
+      button.className = 'outline-item';
+      const badge = document.createElement('span');
+      badge.className = 'outline-level-badge';
+      badge.textContent = levelNames[item.level] ?? 'Sec';
+      const label = document.createElement('span');
+      label.className = 'outline-label';
+      label.textContent = item.label;
+      button.append(badge, label);
+      button.title = `${item.label} (line ${item.line})`;
+      button.style.paddingLeft = (6 + Math.min(item.level, 4) * 8) + 'px';
       button.dataset.outlineAt = String(item.at);
       button.onclick = () => this.jump(file, text, item.at);
       this.outline.append(button);
     }
     if (!entries.length) {
       const empty = document.createElement('p');
-      empty.textContent = 'No headings or environments found.';
+      empty.className = 'outline-empty';
+      empty.textContent = 'No section headings found in this file.';
       this.outline.append(empty);
     }
   }

@@ -513,6 +513,37 @@ async function handle(method:string,args:unknown[]) {
       }
       return {path:fullPath,name,state};
     }
+    case 'copyFiles': {
+      const targetFolder = String(args[0]);
+      const filePaths = (args[1] as string[]) || [];
+      const copied: string[] = [];
+      for (const src of filePaths) {
+        if (!src || typeof src !== 'string') continue;
+        const fileName = path.basename(src);
+        const dest = path.join(targetFolder, fileName);
+        await fs.copyFile(src, dest);
+        copied.push(dest);
+      }
+      return { copied, state };
+    }
+    case 'promptUploadFiles': {
+      const targetFolder = String(args[0] || state.projectFolder || (state.root ? path.dirname(state.root) : ''));
+      if (!targetFolder) throw new Error('Open a project folder first.');
+      const choice = await dialog.showOpenDialog(window, {
+        title: 'Upload or add files to project',
+        buttonLabel: 'Upload',
+        properties: ['openFile', 'multiSelections']
+      });
+      if (choice.canceled || !choice.filePaths.length) return null;
+      const copied: string[] = [];
+      for (const src of choice.filePaths) {
+        const fileName = path.basename(src);
+        const dest = path.join(targetFolder, fileName);
+        await fs.copyFile(src, dest);
+        copied.push(dest);
+      }
+      return { copied, state };
+    }
     case 'createFolder': {
       const parent=String(args[0]),name=String(args[1]).trim();
       if(!name||name.includes('/')||name.includes('\\'))throw new Error('Enter a valid folder name.');
@@ -754,6 +785,10 @@ async function handle(method:string,args:unknown[]) {
       clearTimeout(fullVerification);localPreview.stop();controller?.cancel();state.engine=value.engine!;state.latexmk=value.latexmk;state.texBin=checked.selected??value.texBin;state.toolchainSeen=true;state.onSave=!!value.onSave;
       if(value.theme&&['auto','dark','midnight','nord','light','warm'].includes(value.theme))state.theme=value.theme;
       if(typeof value.pdfInvert==='boolean')state.pdfInvert=value.pdfInvert;
+      if(typeof value.autoClose==='boolean')state.autoClose=value.autoClose;
+      if(typeof value.followPreview==='boolean')state.followPreview=value.followPreview;
+      if(typeof value.previewEditing==='boolean')state.previewEditing=value.previewEditing;
+      if(typeof value.backups==='boolean')state.backups=value.backups;
       updateAppMenu();
       activateToolchain(checked);acknowledgedToolchain=toolchainSignature(checked);await fs.mkdir(data(),{recursive:true});await fs.writeFile(path.join(data(),'toolchain-check.json'),JSON.stringify({acknowledged:acknowledgedToolchain}));await persist();/* A changed installation needs fresh capability caches and workers. */if(state.root&&checked.ready)void selectRoot(state.root).catch(e=>setStatus(String(e)));return {...state,toolchain:checked};
     }
